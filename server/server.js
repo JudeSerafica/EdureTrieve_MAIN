@@ -41,7 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 // 🧭 SUPABASE INIT  
 // =========================
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qzlczoeipplpojxpbsll.supabase.co',
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zjlxodaineyvdsgpjbxo.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bGN6b2VpcHBscG9qeHBic2xsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDQzMDg4NCwiZXhwIjoyMDcwMDA2ODg0fQ.YxhYqccHYEc9FP1AdcaHXTUDg9jD1kOcQSmoaPaTWXw'
 );
 
@@ -51,8 +51,8 @@ const supabase = createClient(
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER || 'sample123@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'etadabxzphtzckzd',
+    user: process.env.GMAIL_USER || 'judeserafica@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD || 'tststrysvudadmbg',
   },
 });
 
@@ -290,7 +290,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
 
     try {
       await transporter.sendMail({
-        from: `"EduRetrieve" <${process.env.GMAIL_USER || 'sample123@gmail.com'}>`,
+        from: `"EduRetrieve" <${process.env.GMAIL_USER || 'judeserafica@gmail.com'}>`,
         to: originalEmail,
         subject: 'Complete Your EduRetrieve Registration',
         html: emailHtml,
@@ -709,7 +709,7 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
   console.log(`🔐 Google OAuth Client ID: ${process.env.GOOGLE_CLIENT_ID ? 'configured' : 'missing'}`);
-  console.log(`📧 Gmail configured: ${process.env.GMAIL_USER || 'sample123@gmail.com'}`);
+  console.log(`📧 Gmail configured: ${process.env.GMAIL_USER || 'judeserafica@gmail.com'}`);
   console.log(`🗄️ Supabase: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'}`);
   console.log('📍 Available endpoints:');
   console.log('   POST /api/auth/google/signup');

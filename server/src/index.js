@@ -1,3 +1,5 @@
+/* VERSION 2 SERVER SIDE */
+
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -39,8 +41,8 @@ const supabase = createClient(
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER || 'sample123@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'etadabxzphtzckzd',
+    user: process.env.GMAIL_USER || 'judeserafica@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD || 'tststrysvudadmbg',
   },
 });
 
@@ -61,66 +63,26 @@ const generateContent = async (prompt, retries = 3) => {
   }
 };
 
-const saveModule = async (userId, moduleId) => {
+const authenticateToken = async (req, res, next) => {
   try {
-    console.log('💾 Saving module:', { userId, moduleId });
-    
-    const response = await fetch('/api/save-module', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}` 
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        module_id: moduleId
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to save module');
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
     }
-    
-    const result = await response.json();
-    console.log('✅ Module saved successfully:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ Error saving module:', error);
-    throw error;
+
+    const token = authHeader.split('Bearer ')[1];
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    req.user = data.user;
+    next();
+  } catch (err) {
+    console.error('❌ Token verification failed:', err.message);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 };
-
-const unsaveModule = async (userId, moduleId) => {
-  try {
-    console.log('🗑️ Unsaving module:', { userId, moduleId });
-    
-    const response = await fetch('/api/unsave-module', {
-      method: 'POST', 
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        module_id: moduleId
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to unsave module');
-    }
-    
-    const result = await response.json();
-    console.log('✅ Module unsaved successfully:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ Error unsaving module:', error);
-    throw error;
-  }
-};
-
 
 app.post('/api/save-module', authenticateToken, async (req, res) => {
   try {
@@ -237,27 +199,6 @@ app.post('/api/unsave-module', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to unsave module: ' + error.message });
   }
 });
-
-const authenticateToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    req.user = data.user;
-    next();
-  } catch (err) {
-    console.error('❌ Token verification failed:', err.message);
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-};
 
 app.post('/api/auth/google/signup', async (req, res) => {
   const { email } = req.body;
@@ -433,7 +374,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
 
     try {
       await transporter.sendMail({
-        from: `"EduRetrieve" <${process.env.GMAIL_USER || 'sample123@gmail.com'}>`,
+        from: `"EduRetrieve" <${process.env.GMAIL_USER || 'judeserafica@gmail.com'}>`,
         to: originalEmail,
         subject: 'Complete Your EduRetrieve Registration',
         html: emailHtml,
@@ -1310,6 +1251,8 @@ app.get('/api/analytics/:userId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    console.log('📊 Fetching analytics for user:', userId);
+
     const [
       { count: modulesUploaded },
       { count: modulesSaved }
@@ -1317,6 +1260,8 @@ app.get('/api/analytics/:userId', authenticateToken, async (req, res) => {
       supabase.from('modules').select('*', { count: 'exact', head: true }).eq('user_id', userId),
       supabase.from('save_modules').select('*', { count: 'exact', head: true }).eq('user_id', userId)
     ]);
+
+    console.log('✅ Analytics retrieved:', { modulesUploaded, modulesSaved });
 
     res.status(200).json({
       modulesUploaded: modulesUploaded || 0,
@@ -1522,9 +1467,9 @@ app.get('/debug/table-structure', authenticateToken, async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: '✅ EduRetrieve backend is running!',
-    version: '2.1.0-fixed',
+    version: '2.2.0-auth-fixed',
     timestamp: new Date().toISOString(),
-    status: 'Database JOIN issues resolved',
+    status: 'Authentication and client-side function issues resolved',
     endpoints: [
       'POST /api/auth/google/signup - Initiate Google OAuth signup',
       'POST /api/auth/google/callback - Handle Google OAuth callback', 
@@ -1535,15 +1480,17 @@ app.get('/', (req, res) => {
       'POST /api/generate-content - Generate AI content',
       'GET /api/protected-data - Test protected route',
       'POST /upload-module - Upload module',
-      'GET /get-modules - Get all modules (FIXED)',
+      'GET /get-modules - Get all modules',
       'GET /get-my-modules - Get user\'s own modules',
-      'GET /get-saved-modules - Get saved modules (FIXED)',
-      'POST /save-module - Save a module',
-      'POST /unsave-module - Unsave a module',
+      'GET /get-saved-modules - Get saved modules',
+      'POST /api/save-module - Save a module (FIXED)',
+      'POST /api/unsave-module - Unsave a module (FIXED)',
+      'POST /save-module - Save a module (legacy endpoint)',
+      'POST /unsave-module - Unsave a module (legacy endpoint)',
       'GET /get-user-profile - Get user profile',
       'POST /sync-user-profile - Update user profile',
       'DELETE /delete-module/:id - Delete module',
-      'GET /api/analytics/:userId - Get user analytics',
+      'GET /api/analytics/:userId - Get user analytics (FIXED)',
       'GET /debug/table-structure - Debug table structure'
     ]
   });
@@ -1552,31 +1499,33 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
   console.log(`🔐 Google OAuth Client ID: ${process.env.GOOGLE_CLIENT_ID ? 'configured' : 'missing'}`);
-  console.log(`📧 Gmail configured: ${process.env.GMAIL_USER || 'sample123@gmail.com'}`);
+  console.log(`📧 Gmail configured: ${process.env.GMAIL_USER || 'judeserafica@gmail.com'}`);
   console.log(`🗄️ Supabase: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'}`);
   console.log('');
   console.log('🔧 FIXES APPLIED:');
-  console.log('   ✅ Removed problematic JOIN queries from /get-modules');
-  console.log('   ✅ Fixed /get-saved-modules with separate queries');
-  console.log('   ✅ Added proper error handling for missing relationships');
-  console.log('   ✅ Improved uploader name resolution');
+  console.log('   ✅ Removed client-side functions (saveModule, unsaveModule) from server code');
+  console.log('   ✅ Fixed authentication middleware placement');
+  console.log('   ✅ Enhanced analytics endpoint logging');
+  console.log('   ✅ Improved error handling for authorization headers');
   console.log('');
   console.log('📍 Available endpoints:');
-  console.log('   POST /api/auth/google/signup');
-  console.log('   POST /api/auth/google/callback');
-  console.log('   POST /api/auth/verify-signup-code');
-  console.log('   POST /api/auth/check-verification-status');
-  console.log('   POST /api/generate-content');
-  console.log('   GET  /api/protected-data');
-  console.log('   POST /upload-module');
-  console.log('   GET  /get-modules (FIXED)');
-  console.log('   GET  /get-my-modules');
-  console.log('   GET  /get-saved-modules (FIXED)');
-  console.log('   POST /save-module');
-  console.log('   POST /unsave-module');
-  console.log('   GET  /get-user-profile');
-  console.log('   POST /sync-user-profile');
-  console.log('   DELETE /delete-module/:id');
-  console.log('   GET  /api/analytics/:userId');
-  console.log('   GET  /debug/table-structure');
+  console.log('   Authentication:');
+  console.log('     POST /api/auth/google/signup');
+  console.log('     POST /api/auth/google/callback');
+  console.log('     POST /api/auth/verify-signup-code');
+  console.log('');
+  console.log('   Modules:');
+  console.log('     POST /upload-module');
+  console.log('     GET  /get-modules');
+  console.log('     GET  /get-my-modules');
+  console.log('     GET  /get-saved-modules');
+  console.log('     POST /api/save-module (new)');
+  console.log('     POST /api/unsave-module (new)');
+  console.log('     POST /save-module (legacy)');
+  console.log('     POST /unsave-module (legacy)');
+  console.log('');
+  console.log('   Analytics & Profile:');
+  console.log('     GET  /api/analytics/:userId');
+  console.log('     GET  /get-user-profile');
+  console.log('     POST /sync-user-profile');
 });
