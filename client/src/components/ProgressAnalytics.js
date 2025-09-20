@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
 
+// Move searchObject outside the component and loop
+function searchObject(obj, key, tokenRef, path = '') {
+  for (const [objKey, objValue] of Object.entries(obj)) {
+    const currentPath = path ? `${path}.${objKey}` : objKey;
+    if (typeof objValue === 'string' && objValue.startsWith('eyJ') && objValue.length > 100) {
+      tokenRef.value = objValue;
+      console.log(`✅ Found JWT token at ${key}.${currentPath}`);
+      return true;
+    }
+    if (typeof objValue === 'object' && objValue !== null) {
+      if (searchObject(objValue, key, tokenRef, currentPath)) return true;
+    }
+  }
+  return false;
+}
+
 function ProgressAnalytics({ user }) {
   const [uploaded, setUploaded] = useState(0);
   const [saved, setSaved] = useState(0);
@@ -17,6 +33,7 @@ function ProgressAnalytics({ user }) {
       try {
         console.log('🔍 Starting token search...');
         let token = null;
+        const tokenRef = { value: null }; // Use an object to hold token reference
         const debugData = {};
 
         const allKeys = Object.keys(localStorage);
@@ -62,22 +79,11 @@ function ProgressAnalytics({ user }) {
               break;
             }
 
-            const searchObject = (obj, path = '') => {
-              for (const [objKey, objValue] of Object.entries(obj)) {
-                const currentPath = path ? `${path}.${objKey}` : objKey;
-                if (typeof objValue === 'string' && objValue.startsWith('eyJ') && objValue.length > 100) {
-                  token = objValue;
-                  console.log(`✅ Found JWT token at ${key}.${currentPath}`);
-                  return true;
-                }
-                if (typeof objValue === 'object' && objValue !== null) {
-                  if (searchObject(objValue, currentPath)) return true;
-                }
-              }
-              return false;
-            };
-
-            if (searchObject(parsed)) break;
+            // Use the moved function here
+            if (searchObject(parsed, key, tokenRef)) {
+              token = tokenRef.value;
+              break;
+            }
             
           } catch (e) {
             // Handle non-JSON values

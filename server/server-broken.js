@@ -41,8 +41,8 @@ app.use(express.urlencoded({ extended: true }));
 // 🧭 SUPABASE INIT  
 // =========================
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zjlxodaineyvdsgpjbxo.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bGN6b2VpcHBscG9qeHBic2xsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDQzMDg4NCwiZXhwIjoyMDcwMDA2ODg0fQ.YxhYqccHYEc9FP1AdcaHXTUDg9jD1kOcQSmoaPaTWXw'
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcepfndjsmktrfcelvgs.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZXBmbmRqc21rdHJmY2VsdmdzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTAwMDkxNiwiZXhwIjoyMDY2NTc2OTE2fQ.uSduSDirvbRdz5_2ySrVTp_sYPGcg6ddP6_XfMDZZKQ'
 );
 
 // =========================
@@ -52,7 +52,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER || 'judeserafica@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'tststrysvudadmbg',
+    pass: process.env.GMAIL_APP_PASSWORD || 'qfqyrdkwxpryeoap',
   },
 });
 
@@ -336,97 +336,115 @@ app.post('/api/auth/verify-signup-code', async (req, res) => {
   const { email, code, password } = req.body;
 
   if (!email || !code || !password) {
-    return res.status(400).json({ 
-      error: 'Email, verification code, and password are required' 
+    return res.status(400).json({
+      error: 'Email, verification code, and password are required'
     });
   }
 
   try {
-    // Check if verification code exists and is valid
     const verificationData = verificationCodes.get(email);
 
     if (!verificationData) {
-      return res.status(400).json({ 
-        error: 'Verification code expired or not found. Please restart the signup process.' 
+      return res.status(400).json({
+        error: 'Verification code expired or not found. Please restart the signup process.'
       });
     }
 
     if (Date.now() > verificationData.expiresAt) {
       verificationCodes.delete(email);
-      return res.status(400).json({ 
-        error: 'Verification code has expired. Please restart the signup process.' 
+      return res.status(400).json({
+        error: 'Verification code has expired. Please restart the signup process.'
       });
     }
 
     if (verificationData.code !== code) {
-      return res.status(400).json({ 
-        error: 'Invalid verification code. Please check and try again.' 
+      return res.status(400).json({
+        error: 'Invalid verification code. Please check and try again.'
       });
     }
 
-    // Create Supabase user account
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // ✅ Safe defaults for Google data
+    const userMeta = verificationData.googleUserInfo || {};
+
+    // 🔑 Create user in Supabase Auth (admin API)
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name: verificationData.googleUserInfo.name,
-          avatar_url: verificationData.googleUserInfo.picture,
-          google_verified: true,
-          google_id: verificationData.googleUserInfo.id
-        }
+      email_confirm: true,
+      user_metadata: {
+        full_name: userMeta.name || '',
+        first_name: userMeta.given_name || '',
+        last_name: userMeta.family_name || '',
+        avatar_url: userMeta.picture || '',
+        google_verified: true,
+        google_id: userMeta.id || ''
       }
     });
 
     if (authError) {
-      console.error('❌ Supabase signup error:', authError.message);
+      console.error('❌ Supabase signup error:', authError);
+
+      if (authError.message.includes('duplicate key value')) {
+        return res.status(400).json({
+          error: 'User already exists. Please log in instead.'
+        });
+      }
+
       return res.status(400).json({ error: authError.message });
     }
 
-    // Create user profile in profiles table
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: authData.user.id,
-          email: email,
-          username: verificationData.googleUserInfo.given_name || email.split('@')[0],
-          fullName: verificationData.googleUserInfo.name,
-          pfpUrl: verificationData.googleUserInfo.picture || '',
-          google_verified: true,
-          google_id: verificationData.googleUserInfo.id,
-          created_at: new Date().toISOString()
-        }]);
+    console.log('✅ Auth user created:', authData.user.id);
 
-      if (profileError) {
-        console.warn('⚠️ Profile creation warning:', profileError.message);
-      } else {
-        console.log('✅ Profile created for user:', authData.user.id);
-      }
+    // ✅ Insert into profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert([{
+        id: authData.user.id,
+        email,
+        username: userMeta.given_name || email.split('@')[0],
+        fullName: userMeta.name || '',
+        pfpUrl: userMeta.picture || '',
+        google_verified: true,
+        google_id: userMeta.id || '',
+        created_at: new Date().toISOString()
+      }]);
+
+    if (profileError) {
+      console.error('❌ Profile creation error:', profileError);
+      return res.status(400).json({ error: profileError.message });
     }
 
-    // Clean up verification data
+    // ✅ Create a session for the new user
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (signInError) {
+      console.error("❌ Session creation error:", signInError);
+      return res.status(400).json({ error: signInError.message });
+    }
+
     verificationCodes.delete(email);
 
-    console.log('✅ Signup completed for:', email);
-
+    // ✅ Send back session so frontend can set it
     res.status(200).json({
       message: 'Signup completed successfully!',
       user: {
-        id: authData.user?.id,
-        email: authData.user?.email,
-        fullName: verificationData.googleUserInfo.name,
-        avatar: verificationData.googleUserInfo.picture,
+        id: authData.user.id,
+        email: authData.user.email,
+        fullName: userMeta.name || '',
+        avatar: userMeta.picture || '',
         googleVerified: true
       },
-      session: authData.session
+      session: signInData.session
     });
 
   } catch (error) {
     console.error('❌ Signup verification error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to complete signup',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -473,14 +491,27 @@ app.post('/api/auth/check-verification-status', (req, res) => {
 
 // AI Generation Endpoint
 app.post('/api/generate-content', async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, userId, conversationId } = req.body;
 
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required.' });
+  if (!prompt || !userId || !conversationId) {
+    return res.status(400).json({ error: 'Prompt, userId, and conversationId are required.' });
   }
 
   try {
+    // 🧠 Generate content using Gemini (or other LLM)
     const content = await generateContent(prompt);
+
+    // 🧾 (Optional) Save chat to your database — if you're storing conversation history
+    // await supabase.from('chat_messages').insert([
+    //   {
+    //     user_id: userId,
+    //     conversation_id: conversationId,
+    //     prompt: prompt,
+    //     response: content,
+    //     created_at: new Date().toISOString()
+    //   }
+    // ]);
+
     res.status(200).json({ generatedContent: content });
   } catch (error) {
     console.error('❌ Gemini API Error:', error);

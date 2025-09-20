@@ -1,5 +1,3 @@
-/* VERSION 2 SERVER SIDE */
-
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -24,26 +22,24 @@ const googleClient = new OAuth2Client(
   'http://localhost:3000/auth/callback'
 );
 
-console.log('🔐 OAuth Configuration:');
-console.log('Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Missing');
-console.log('Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Set' : 'Missing');
-console.log('Redirect URI: http://localhost:3000/auth/callback');
-
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qzlczoeipplpojxpbsll.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bGN6b2VpcHBscG9qeHBic2xsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDQzMDg4NCwiZXhwIjoyMDcwMDA2ODg0fQ.YxhYqccHYEc9FP1AdcaHXTUDg9jD1kOcQSmoaPaTWXw'
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcepfndjsmktrfcelvgs.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZXBmbmRqc21rdHJmY2VsdmdzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTAwMDkxNiwiZXhwIjoyMDY2NTc2OTE2fQ.uSduSDirvbRdz5_2ySrVTp_sYPGcg6ddP6_XfMDZZKQ'
 );
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER || 'judeserafica@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'tststrysvudadmbg',
+    pass: process.env.GMAIL_APP_PASSWORD || 'qfqyrdkwxpryeoap',
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 const verificationCodes = new Map();
@@ -58,7 +54,6 @@ const generateContent = async (prompt, retries = 3) => {
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (error) {
-    console.error("❌ Gemini API error:", error.message || error);
     throw new Error("Failed to generate content from AI.");
   }
 };
@@ -79,7 +74,6 @@ const authenticateToken = async (req, res, next) => {
     req.user = data.user;
     next();
   } catch (err) {
-    console.error('❌ Token verification failed:', err.message);
     return res.status(401).json({ error: 'Unauthorized' });
   }
 };
@@ -87,19 +81,14 @@ const authenticateToken = async (req, res, next) => {
 app.post('/api/save-module', authenticateToken, async (req, res) => {
   try {
     const { user_id, module_id } = req.body;
-    
+
     const authenticatedUserId = req.user.id;
-    
+
     if (!module_id) {
-      return res.status(400).json({ 
-        error: 'module_id is required' 
+      return res.status(400).json({
+        error: 'module_id is required'
       });
     }
-    
-    console.log('💾 Saving module:', { 
-      user_id: authenticatedUserId, 
-      module_id 
-    });
 
     const { data: moduleExists, error: checkError } = await supabase
       .from('modules')
@@ -108,7 +97,6 @@ app.post('/api/save-module', authenticateToken, async (req, res) => {
       .single();
 
     if (checkError || !moduleExists) {
-      console.error('❌ Module not found:', checkError?.message);
       return res.status(404).json({ error: 'Module not found' });
     }
 
@@ -120,12 +108,12 @@ app.post('/api/save-module', authenticateToken, async (req, res) => {
       .single();
 
     if (alreadySaved) {
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: 'Module already saved',
         data: alreadySaved
       });
     }
-    
+
     const { data, error } = await supabase
       .from('save_modules')
       .insert([{
@@ -134,29 +122,25 @@ app.post('/api/save-module', authenticateToken, async (req, res) => {
         saved_at: new Date().toISOString()
       }])
       .select();
-    
+
     if (error) {
-      console.error('❌ Save module error:', error);
-      
       if (error.code === '23505') {
-        return res.status(200).json({ 
+        return res.status(200).json({
           message: 'Module already saved by this user',
           data: null
         });
       }
-      
+
       return res.status(500).json({ error: error.message });
     }
-    
-    console.log('✅ Module saved successfully:', data[0]);
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'Module saved successfully',
       data: data[0]
     });
-    
+
   } catch (error) {
-    console.error('❌ Save module error:', error);
     res.status(500).json({ error: 'Failed to save module: ' + error.message });
   }
 });
@@ -165,37 +149,29 @@ app.post('/api/unsave-module', authenticateToken, async (req, res) => {
   try {
     const { module_id } = req.body;
     const authenticatedUserId = req.user.id;
-    
+
     if (!module_id) {
-      return res.status(400).json({ 
-        error: 'module_id is required' 
+      return res.status(400).json({
+        error: 'module_id is required'
       });
     }
 
-    console.log('🗑️ Unsaving module:', { 
-      user_id: authenticatedUserId, 
-      module_id 
-    });
-    
     const { error } = await supabase
       .from('save_modules')
       .delete()
       .eq('user_id', authenticatedUserId)
       .eq('module_id', module_id);
-    
+
     if (error) {
-      console.error('❌ Unsave module error:', error);
       return res.status(500).json({ error: error.message });
     }
-    
-    console.log('✅ Module unsaved successfully');
-    res.json({ 
-      success: true, 
-      message: 'Module unsaved successfully' 
+
+    res.json({
+      success: true,
+      message: 'Module unsaved successfully'
     });
-    
+
   } catch (error) {
-    console.error('❌ Unsave module error:', error);
     res.status(500).json({ error: 'Failed to unsave module: ' + error.message });
   }
 });
@@ -218,15 +194,12 @@ app.post('/api/auth/google/signup', async (req, res) => {
       prompt: 'consent'
     });
 
-    console.log('🔗 Generated auth URL for:', email);
-    
     res.status(200).json({
       message: 'Redirect to Google for authorization',
       authUrl,
       email
     });
   } catch (error) {
-    console.error('❌ Google OAuth URL generation error:', error);
     res.status(500).json({ error: 'Failed to generate Google auth URL' });
   }
 });
@@ -234,16 +207,8 @@ app.post('/api/auth/google/signup', async (req, res) => {
 app.post('/api/auth/google/callback', async (req, res) => {
   const { code, state } = req.body;
 
-  console.log('🔄 OAuth Callback received:', {
-    hasCode: !!code,
-    hasState: !!state,
-    codeLength: code ? code.length : 0,
-    stateContent: state ? state.substring(0, 100) + '...' : 'none'
-  });
-
   if (!code || !state) {
-    console.error('❌ Missing parameters:', { code: !!code, state: !!state });
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Missing authorization code or state',
       details: 'Both code and state parameters are required'
     });
@@ -254,18 +219,16 @@ app.post('/api/auth/google/callback', async (req, res) => {
     try {
       parsedState = JSON.parse(state);
     } catch (parseError) {
-      console.error('❌ State parsing error:', parseError);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid state parameter',
         details: 'Could not parse state JSON'
       });
     }
 
     const { email: originalEmail, action } = parsedState;
-    console.log('📧 Processing callback for email:', originalEmail);
 
     if (!originalEmail) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid state: missing email',
         details: 'State parameter must contain email'
       });
@@ -278,10 +241,8 @@ app.post('/api/auth/google/callback', async (req, res) => {
         redirect_uri: 'http://localhost:3000/auth/callback'
       });
       tokens = tokenResponse.tokens;
-      console.log('🔑 Token exchange successful');
     } catch (tokenError) {
-      console.error('❌ Token exchange error:', tokenError);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Failed to exchange authorization code',
         details: tokenError.message
       });
@@ -302,24 +263,14 @@ app.post('/api/auth/google/callback', async (req, res) => {
       }
 
       googleUserInfo = await response.json();
-      console.log('👤 Google user info retrieved:', {
-        email: googleUserInfo.email,
-        name: googleUserInfo.name,
-        verified: googleUserInfo.verified_email
-      });
     } catch (fetchError) {
-      console.error('❌ Failed to fetch user info:', fetchError);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to fetch user info from Google',
         details: fetchError.message
       });
     }
-    
+
     if (googleUserInfo.email !== originalEmail) {
-      console.error('❌ Email mismatch:', {
-        expected: originalEmail,
-        received: googleUserInfo.email
-      });
       return res.status(400).json({
         error: 'Email mismatch. Please use the same email address.',
         details: `Expected ${originalEmail}, got ${googleUserInfo.email}`
@@ -327,14 +278,13 @@ app.post('/api/auth/google/callback', async (req, res) => {
     }
 
     if (!googleUserInfo.verified_email) {
-      console.error('❌ Google email not verified');
       return res.status(400).json({
         error: 'Google email is not verified. Please verify your email with Google first.'
       });
     }
 
     const verificationCode = generateVerificationCode();
-    const expiresAt = Date.now() + 10 * 60 * 1000; 
+    const expiresAt = Date.now() + 10 * 60 * 1000;
 
     verificationCodes.set(originalEmail, {
       code: verificationCode,
@@ -342,8 +292,6 @@ app.post('/api/auth/google/callback', async (req, res) => {
       googleUserInfo,
       action
     });
-
-    console.log('🔐 Verification code generated and stored for:', originalEmail);
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -354,19 +302,19 @@ app.post('/api/auth/google/callback', async (req, res) => {
           <h2>Complete Your Registration</h2>
           <p>Hi ${googleUserInfo.name}!</p>
           <p>Your Google account has been verified successfully. To complete your EduRetrieve registration, please enter this verification code:</p>
-          
+
           <div style="text-align: center; margin: 30px 0;">
             <div style="background-color: #007bff; color: white; padding: 15px 30px; border-radius: 8px; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 3px;">
               ${verificationCode}
             </div>
           </div>
-          
+
           <p><strong>This code will expire in 10 minutes.</strong></p>
           <p>Google Account Details:</p>
           <ul>
             <li>Email: ${googleUserInfo.email}</li>
             <li>Name: ${googleUserInfo.name}</li>
-            <li>Verified: ✅</li>
+            <li>Verified: Yes</li>
           </ul>
         </div>
       </div>
@@ -379,20 +327,14 @@ app.post('/api/auth/google/callback', async (req, res) => {
         subject: 'Complete Your EduRetrieve Registration',
         html: emailHtml,
       });
-      console.log('✅ Verification email sent to:', originalEmail);
     } catch (emailError) {
-      console.error('❌ Email sending failed:', emailError);
-      console.warn('⚠️ Continuing despite email failure');
     }
 
     setTimeout(() => {
       if (verificationCodes.has(originalEmail)) {
         verificationCodes.delete(originalEmail);
-        console.log('🗑️ Expired verification code cleaned up for:', originalEmail);
       }
     }, 10 * 60 * 1000);
-
-    console.log('✅ OAuth callback processed successfully for:', originalEmail);
 
     res.status(200).json({
       message: 'Google verification successful. Check your email for the final verification code.',
@@ -403,9 +345,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Google OAuth callback error:', error);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to process Google authentication',
       details: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -417,8 +357,8 @@ app.post('/api/auth/verify-signup-code', async (req, res) => {
   const { email, code, password } = req.body;
 
   if (!email || !code || !password) {
-    return res.status(400).json({ 
-      error: 'Email, verification code, and password are required' 
+    return res.status(400).json({
+      error: 'Email, verification code, and password are required'
     });
   }
 
@@ -426,111 +366,131 @@ app.post('/api/auth/verify-signup-code', async (req, res) => {
     const verificationData = verificationCodes.get(email);
 
     if (!verificationData) {
-      return res.status(400).json({ 
-        error: 'Verification code expired or not found. Please restart the signup process.' 
+      return res.status(400).json({
+        error: 'Verification code expired or not found. Please restart the signup process.'
       });
     }
 
     if (Date.now() > verificationData.expiresAt) {
       verificationCodes.delete(email);
-      return res.status(400).json({ 
-        error: 'Verification code has expired. Please restart the signup process.' 
+      return res.status(400).json({
+        error: 'Verification code has expired. Please restart the signup process.'
       });
     }
 
     if (verificationData.code !== code) {
-      return res.status(400).json({ 
-        error: 'Invalid verification code. Please check and try again.' 
+      return res.status(400).json({
+        error: 'Invalid verification code. Please check and try again.'
       });
     }
 
-    console.log('📧 Creating user with Google info:', {
-      email,
-      name: verificationData.googleUserInfo.name,
-      given_name: verificationData.googleUserInfo.given_name,
-      family_name: verificationData.googleUserInfo.family_name
-    });
+    const userMeta = verificationData.googleUserInfo || {};
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
       user_metadata: {
-        full_name: verificationData.googleUserInfo.name,
-        first_name: verificationData.googleUserInfo.given_name,
-        last_name: verificationData.googleUserInfo.family_name,
-        avatar_url: verificationData.googleUserInfo.picture,
+        full_name: userMeta.name || '',
+        first_name: userMeta.given_name || '',
+        last_name: userMeta.family_name || '',
+        avatar_url: userMeta.picture || '',
         google_verified: true,
-        google_id: verificationData.googleUserInfo.id
+        google_id: userMeta.id || ''
       }
     });
 
     if (authError) {
-      console.error('❌ Supabase signup error:', authError.message);
-      return res.status(400).json({ error: authError.message });
-    }
-
-    console.log('✅ User created successfully:', authData.user.id);
-
-    if (authData.user) {
-      const fullName = verificationData.googleUserInfo.name || 
-                      `${verificationData.googleUserInfo.given_name || ''} ${verificationData.googleUserInfo.family_name || ''}`.trim() ||
-                      email.split('@')[0].split('.').map(part => 
-                        part.charAt(0).toUpperCase() + part.slice(1)
-                      ).join(' ');
-
-      const username = verificationData.googleUserInfo.given_name || 
-                      fullName.split(' ')[0] || 
-                      email.split('@')[0];
-
-      console.log('📝 Creating profile with:', {
-        fullName,
-        username,
-        email
+      console.error('Auth Error Details:', {
+        code: authError.code,
+        message: authError.message,
+        details: authError.details
       });
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: authData.user.id,
-          email: email,
-          username: username,
-          fullName: fullName,
-          pfpUrl: verificationData.googleUserInfo.picture || '',
-          google_verified: true,
-          google_id: verificationData.googleUserInfo.id,
-          created_at: new Date().toISOString()
-        }]);
-
-      if (profileError) {
-        console.error('❌ Profile creation error:', profileError);
-        console.warn('⚠️ Profile creation failed, but user account created successfully');
-      } else {
-        console.log('✅ Profile created successfully for user:', authData.user.id);
+      if (authError.message.includes('duplicate key value') ||
+          authError.message.includes('already registered') ||
+          authError.code === 'user_already_exists') {
+        return res.status(400).json({
+          error: 'User already exists. Please log in instead.'
+        });
       }
+
+      return res.status(500).json({ error: 'Database error creating new user' });
+    }
+
+    // ✅ FIXED: Changed fullName to fullname, pfpUrl to pfpurl
+    const profileData = {
+      id: authData.user.id,
+      email,
+      username: userMeta.given_name || email.split('@')[0],
+      fullname: userMeta.name || '',
+      pfpurl: userMeta.picture || '',
+      google_verified: true,
+      google_id: userMeta.id || '',
+      created_at: new Date().toISOString()
+    };
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert([profileData]);
+
+    if (profileError) {
+      console.error('Profile Error Details:', {
+        code: profileError.code,
+        message: profileError.message,
+        details: profileError.details
+      });
+
+      if (profileError.code === '23505' || profileError.message.includes('duplicate key')) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            email,
+            username: userMeta.given_name || email.split('@')[0],
+            fullname: userMeta.name || '',
+            pfpurl: userMeta.picture || '',
+            google_verified: true,
+            google_id: userMeta.id || '',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', authData.user.id);
+
+        if (updateError) {
+          console.error('Profile Update Error:', updateError);
+          return res.status(500).json({ error: 'Database error creating new user' });
+        }
+      } else {
+        return res.status(500).json({ error: 'Database error creating new user' });
+      }
+    }
+
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (signInError) {
+      return res.status(400).json({ error: signInError.message });
     }
 
     verificationCodes.delete(email);
 
-    console.log('✅ Signup completed for:', email);
-
     res.status(200).json({
       message: 'Signup completed successfully!',
       user: {
-        id: authData.user?.id,
-        email: authData.user?.email,
-        fullName: verificationData.googleUserInfo.name,
-        avatar: verificationData.googleUserInfo.picture,
+        id: authData.user.id,
+        email: authData.user.email,
+        fullName: userMeta.name || '', // This is just response data, not database
+        avatar: userMeta.picture || '',
         googleVerified: true
       },
-      session: authData.session
+      session: signInData.session
     });
 
   } catch (error) {
-    console.error('❌ Signup verification error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to complete signup',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -544,23 +504,22 @@ app.post('/api/auth/check-user-status', async (req, res) => {
 
   try {
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
-    
+
     if (error) {
-      console.error('❌ Error checking users:', error);
       return res.status(500).json({ error: 'Failed to check user status' });
     }
 
     const user = users.find(u => u.email === email.trim().toLowerCase());
-    
+
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         exists: false,
-        message: 'No account found with this email' 
+        message: 'No account found with this email'
       });
     }
 
     const isEmailConfirmed = !!user.email_confirmed_at;
-    
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -581,7 +540,6 @@ app.post('/api/auth/check-user-status', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Check user status error:', error);
     res.status(500).json({ error: 'Failed to check user status' });
   }
 });
@@ -594,8 +552,6 @@ app.post('/api/auth/sync-profile-on-login', async (req, res) => {
   }
 
   try {
-    console.log('🔄 Syncing profile for user:', userId);
-
     const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
     if (usersError) throw usersError;
 
@@ -612,31 +568,34 @@ app.post('/api/auth/sync-profile-on-login', async (req, res) => {
       throw selectError;
     }
 
-    const fullName = userMetadata.full_name || 
-                    userData?.full_name || 
+    // ✅ FIXED: Changed existingProfile?.fullName to existingProfile?.fullname
+    const fullname = userMetadata.full_name ||
+                    userData?.full_name ||
                     userData?.name ||
-                    existingProfile?.fullName ||
-                    email.split('@')[0].split('.').map(part => 
+                    existingProfile?.fullname ||
+                    email.split('@')[0].split('.').map(part =>
                       part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
                     ).join(' ');
 
     const username = userMetadata.first_name ||
                     userData?.first_name ||
-                    fullName.split(' ')[0] || 
+                    fullname.split(' ')[0] ||
                     email.split('@')[0];
 
-    const pfpUrl = userMetadata.avatar_url || 
-                  userData?.avatar_url || 
-                  userData?.picture || 
-                  existingProfile?.pfpUrl || 
+    // ✅ FIXED: Changed existingProfile?.pfpUrl to existingProfile?.pfpurl
+    const pfpurl = userMetadata.avatar_url ||
+                  userData?.avatar_url ||
+                  userData?.picture ||
+                  existingProfile?.pfpurl ||
                   '';
 
+    // ✅ FIXED: Changed fullName to fullname, pfpUrl to pfpurl
     const profileData = {
       id: userId,
       email: email,
       username: username,
-      fullName: fullName,
-      pfpUrl: pfpUrl,
+      fullname: fullname,
+      pfpurl: pfpurl,
       google_verified: userMetadata.google_verified || userData?.google_verified || false,
       google_id: userMetadata.google_id || userData?.google_id || null,
       updated_at: new Date().toISOString()
@@ -645,13 +604,6 @@ app.post('/api/auth/sync-profile-on-login', async (req, res) => {
     if (!existingProfile) {
       profileData.created_at = new Date().toISOString();
     }
-
-    console.log('📝 Profile data to upsert:', {
-      fullName,
-      username,
-      email,
-      hasAvatar: !!pfpUrl
-    });
 
     const { data: upsertedProfile, error: upsertError } = await supabase
       .from('profiles')
@@ -663,18 +615,15 @@ app.post('/api/auth/sync-profile-on-login', async (req, res) => {
       throw upsertError;
     }
 
-    console.log('✅ Profile synced successfully for:', email);
-
     res.status(200).json({
       message: existingProfile ? 'Profile updated successfully' : 'Profile created successfully',
       profile: upsertedProfile
     });
 
   } catch (error) {
-    console.error('❌ Profile sync error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to sync profile',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -689,17 +638,17 @@ app.post('/api/auth/check-verification-status', (req, res) => {
   const verificationData = verificationCodes.get(email);
 
   if (!verificationData) {
-    return res.status(404).json({ 
+    return res.status(404).json({
       hasVerification: false,
-      message: 'No pending verification found' 
+      message: 'No pending verification found'
     });
   }
 
   if (Date.now() > verificationData.expiresAt) {
     verificationCodes.delete(email);
-    return res.status(410).json({ 
+    return res.status(410).json({
       hasVerification: false,
-      message: 'Verification expired' 
+      message: 'Verification expired'
     });
   }
 
@@ -723,7 +672,6 @@ app.post('/api/generate-content', async (req, res) => {
     const content = await generateContent(prompt);
     res.status(200).json({ generatedContent: content });
   } catch (error) {
-    console.error('❌ Gemini API Error:', error);
     res.status(503).json({ error: 'Failed to generate content. Please try again later.' });
   }
 });
@@ -740,20 +688,12 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
   try {
     const { title, description } = req.body;
     let { file_url, file_name } = req.body;
-    
+
     if (!title || !description) {
       return res.status(400).json({ error: 'Title and description are required' });
     }
 
-    console.log('📤 Starting module upload:', { 
-      title, 
-      hasBodyFile: !!file_url,
-      hasMulterFile: !!req.file 
-    });
-
     if (req.file && !file_url) {
-      console.log('📁 Processing uploaded file:', req.file.originalname);
-      
       try {
         const fileExt = req.file.originalname.split('.').pop();
         const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -762,17 +702,15 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
         try {
           const { data: buckets } = await supabase.storage.listBuckets();
           const moduleFilesBucket = buckets.find(bucket => bucket.name === 'module-files');
-          
+
           if (!moduleFilesBucket) {
-            console.log('🗄️ Creating module-files bucket...');
-            await supabase.storage.createBucket('module-files', { 
+            await supabase.storage.createBucket('module-files', {
               public: true,
               allowedMimeTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
               fileSizeLimit: 10485760
             });
           }
         } catch (bucketError) {
-          console.warn('⚠️ Bucket creation warning (might already exist):', bucketError.message);
         }
 
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -784,7 +722,6 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
           });
 
         if (uploadError) {
-          console.error('❌ File upload error:', uploadError);
           throw new Error(`File upload failed: ${uploadError.message}`);
         }
 
@@ -794,36 +731,30 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
 
         file_url = publicUrl;
         file_name = req.file.originalname;
-        
-        console.log('✅ File uploaded successfully:', {
-          path: filePath,
-          url: file_url,
-          name: file_name
-        });
 
       } catch (fileError) {
-        console.error('❌ File processing error:', fileError);
-        console.warn('⚠️ Continuing without file due to upload error');
         file_url = null;
         file_name = null;
       }
     }
 
+    // ✅ FIXED: Changed 'fullName' to 'fullname' in SELECT query
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('username, fullName')
+      .select('username, fullname')
       .eq('id', req.user.id)
       .single();
 
     let uploaderName = 'Anonymous';
-    
-    if (profileData?.fullName) {
-      uploaderName = profileData.fullName;
+
+    // ✅ FIXED: Changed profileData?.fullName to profileData?.fullname
+    if (profileData?.fullname) {
+      uploaderName = profileData.fullname;
     } else if (profileData?.username) {
       uploaderName = profileData.username;
     } else if (req.user.email) {
       const emailPart = req.user.email.split('@')[0];
-      uploaderName = emailPart.split('.').map(part => 
+      uploaderName = emailPart.split('.').map(part =>
         part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
       ).join(' ');
     }
@@ -839,7 +770,6 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
     if (file_url) {
       insertData.file_url = file_url;
       insertData.file_name = file_name;
-      console.log('📎 Including file data in module:', { file_url, file_name });
     }
 
     const { data, error } = await supabase
@@ -848,29 +778,18 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
       .select();
 
     if (error) {
-      console.error('❌ Database insert error:', error);
-      
       if (file_url && file_url.includes('module-files')) {
         try {
           const filePath = file_url.split('/module-files/')[1];
           await supabase.storage.from('module-files').remove([filePath]);
-          console.log('🧹 Cleaned up uploaded file after DB error');
         } catch (cleanupError) {
-          console.warn('⚠️ Failed to cleanup file:', cleanupError.message);
         }
       }
-      
+
       throw error;
     }
 
-    console.log('✅ Module created successfully:', {
-      id: data[0].id,
-      title: data[0].title,
-      hasFile: !!data[0].file_url,
-      uploaderName
-    });
-
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Module uploaded successfully',
       data: {
         ...data[0],
@@ -880,8 +799,7 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
     });
 
   } catch (error) {
-    console.error('❌ Upload module error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Upload failed: ' + error.message,
       details: error.stack
     });
@@ -890,23 +808,27 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
 
 app.get('/get-modules', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Fetching all modules...');
+    const { show_all } = req.query;
 
-    const { data: modulesData, error: modulesError } = await supabase
-      .from('modules')
-      .select('*')
+    let query = supabase.from('modules').select('*');
+
+    if (!show_all || show_all !== 'true') {
+      query = query.eq('user_id', req.user.id);
+    }
+
+    const { data: modulesData, error: modulesError } = await query
       .order('created_at', { ascending: false });
 
     if (modulesError) {
-      console.error('❌ Get modules error:', modulesError);
       throw modulesError;
     }
 
     const userIds = [...new Set(modulesData.map(m => m.user_id))];
-    
+
+    // ✅ FIXED: Changed 'fullName' to 'fullname' in SELECT query
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, username, fullName')
+      .select('id, username, fullname')
       .in('id', userIds);
 
     const profilesMap = new Map();
@@ -916,12 +838,14 @@ app.get('/get-modules', authenticateToken, async (req, res) => {
 
     const modules = modulesData.map(module => {
       const profile = profilesMap.get(module.user_id);
-      
+
       let uploaderName = 'Unknown User';
-      if (module.uploaded_by) {
+      if (module.user_id === req.user.id) {
+        uploaderName = 'You';
+      } else if (module.uploaded_by) {
         uploaderName = module.uploaded_by;
-      } else if (profile?.fullName) {
-        uploaderName = profile.fullName;
+      } else if (profile?.fullname) { // ✅ FIXED: Changed fullName to fullname
+        uploaderName = profile.fullname;
       } else if (profile?.username) {
         uploaderName = profile.username;
       }
@@ -929,15 +853,17 @@ app.get('/get-modules', authenticateToken, async (req, res) => {
       return {
         ...module,
         uploadedAt: module.created_at,
-        uploadedBy: uploaderName
+        uploadedBy: uploaderName,
+        isOwn: module.user_id === req.user.id
       };
     });
 
-    console.log('✅ Retrieved modules:', modules.length);
-
-    res.status(200).json({ modules });
+    res.status(200).json({
+      modules,
+      showingAll: show_all === 'true',
+      totalCount: modules.length
+    });
   } catch (error) {
-    console.error('❌ Get modules error:', error);
     res.status(500).json({ error: 'Failed to get modules: ' + error.message });
   }
 });
@@ -952,24 +878,24 @@ app.get('/get-user-profile', authenticateToken, async (req, res) => {
 
     if (error && error.code !== 'PGRST116') throw error;
 
-    res.status(200).json({ 
+    res.status(200).json({
       profile: data || {
         id: req.user.id,
         email: req.user.email,
         username: '',
-        fullName: '',
-        pfpUrl: ''
+        fullname: '', // ✅ FIXED: Changed from fullName to fullname
+        pfpurl: ''   // ✅ FIXED: Changed from pfpUrl to pfpurl
       }
     });
   } catch (error) {
-    console.error('❌ Get profile error:', error);
     res.status(500).json({ error: 'Failed to get profile' });
   }
 });
 
 app.post('/sync-user-profile', authenticateToken, async (req, res) => {
   try {
-    const { username, fullName, pfpUrl } = req.body;
+    // ✅ FIXED: Changed fullName to fullname, pfpUrl to pfpurl in request body
+    const { username, fullname, pfpurl } = req.body;
 
     const { data, error } = await supabase
       .from('profiles')
@@ -977,20 +903,19 @@ app.post('/sync-user-profile', authenticateToken, async (req, res) => {
         id: req.user.id,
         email: req.user.email,
         username: username || '',
-        fullName: fullName || '',
-        pfpUrl: pfpUrl || '',
+        fullname: fullname || '', // ✅ FIXED: Changed from fullName
+        pfpurl: pfpurl || '',     // ✅ FIXED: Changed from pfpUrl
         updated_at: new Date().toISOString()
       })
       .select();
 
     if (error) throw error;
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Profile updated successfully',
       profile: data[0]
     });
   } catch (error) {
-    console.error('❌ Sync profile error:', error);
     res.status(500).json({ error: 'Failed to sync profile' });
   }
 });
@@ -1022,15 +947,12 @@ app.delete('/delete-module/:moduleId', authenticateToken, async (req, res) => {
       try {
         const filePath = moduleData.file_url.split('/module-files/')[1];
         await supabase.storage.from('module-files').remove([filePath]);
-        console.log('🧹 Cleaned up file for deleted module:', filePath);
       } catch (fileError) {
-        console.warn('⚠️ Failed to cleanup file:', fileError.message);
       }
     }
 
     res.status(200).json({ message: 'Module deleted successfully' });
   } catch (error) {
-    console.error('❌ Delete module error:', error);
     res.status(500).json({ error: 'Failed to delete module' });
   }
 });
@@ -1053,15 +975,12 @@ app.get('/get-my-modules', authenticateToken, async (req, res) => {
 
     res.status(200).json({ modules });
   } catch (error) {
-    console.error('❌ Get my modules error:', error);
     res.status(500).json({ error: 'Failed to get your modules' });
   }
 });
 
 app.get('/get-saved-modules', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Fetching saved modules for user:', req.user.id);
-
     const { data: savedData, error: savedError } = await supabase
       .from('save_modules')
       .select('module_id, saved_at')
@@ -1069,7 +988,6 @@ app.get('/get-saved-modules', authenticateToken, async (req, res) => {
       .order('saved_at', { ascending: false });
 
     if (savedError) {
-      console.error('❌ Get saved modules error:', savedError);
       throw savedError;
     }
 
@@ -1084,14 +1002,14 @@ app.get('/get-saved-modules', authenticateToken, async (req, res) => {
       .in('id', moduleIds);
 
     if (modulesError) {
-      console.error('❌ Get modules data error:', modulesError);
       throw modulesError;
     }
 
     const userIds = [...new Set(modulesData.map(m => m.user_id))];
+    // ✅ FIXED: Changed 'fullName' to 'fullname' in SELECT query
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, username, fullName')
+      .select('id, username, fullname')
       .in('id', userIds);
 
     const profilesMap = new Map();
@@ -1105,15 +1023,15 @@ app.get('/get-saved-modules', authenticateToken, async (req, res) => {
     });
 
     const modules = modulesData
-      .filter(module => module) 
+      .filter(module => module)
       .map(module => {
         const profile = profilesMap.get(module.user_id);
-        
+
         let uploaderName = 'Unknown User';
         if (module.uploaded_by) {
           uploaderName = module.uploaded_by;
-        } else if (profile?.fullName) {
-          uploaderName = profile.fullName;
+        } else if (profile?.fullname) { // ✅ FIXED: Changed fullName to fullname
+          uploaderName = profile.fullname;
         } else if (profile?.username) {
           uploaderName = profile.username;
         }
@@ -1126,11 +1044,8 @@ app.get('/get-saved-modules', authenticateToken, async (req, res) => {
         };
       });
 
-    console.log('✅ Retrieved saved modules:', modules.length);
-
     res.status(200).json({ modules });
   } catch (error) {
-    console.error('❌ Get saved modules error:', error);
     res.status(500).json({ error: 'Failed to get saved modules: ' + error.message });
   }
 });
@@ -1143,8 +1058,6 @@ app.post('/save-module', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Module ID is required' });
     }
 
-    console.log('💾 Saving module:', { module_id, user_id: req.user.id });
-
     const { data: moduleExists, error: checkError } = await supabase
       .from('modules')
       .select('id, title')
@@ -1152,7 +1065,6 @@ app.post('/save-module', authenticateToken, async (req, res) => {
       .single();
 
     if (checkError || !moduleExists) {
-      console.error('❌ Module not found:', checkError?.message);
       return res.status(404).json({ error: 'Module not found' });
     }
 
@@ -1164,8 +1076,7 @@ app.post('/save-module', authenticateToken, async (req, res) => {
       .single();
 
     if (alreadySaved) {
-      console.log('⚠️ Module already saved by user');
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: 'Module already saved',
         data: alreadySaved
       });
@@ -1181,18 +1092,14 @@ app.post('/save-module', authenticateToken, async (req, res) => {
       .select();
 
     if (error) {
-      console.error('❌ Save module database error:', error);
       throw error;
     }
 
-    console.log('✅ Module saved successfully:', data[0]);
-
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Module saved successfully',
       data: data[0]
     });
   } catch (error) {
-    console.error('❌ Save module error:', error);
     res.status(500).json({ error: 'Failed to save module: ' + error.message });
   }
 });
@@ -1204,8 +1111,6 @@ app.post('/unsave-module', authenticateToken, async (req, res) => {
     if (!module_id) {
       return res.status(400).json({ error: 'Module ID is required' });
     }
-
-    console.log('🗑️ Unsaving module:', { module_id, user_id: req.user.id });
 
     const { data: savedModule, error: checkError } = await supabase
       .from('save_modules')
@@ -1219,7 +1124,6 @@ app.post('/unsave-module', authenticateToken, async (req, res) => {
     }
 
     if (!savedModule) {
-      console.log('⚠️ Module was not saved by user');
       return res.status(200).json({ message: 'Module was not saved' });
     }
 
@@ -1230,15 +1134,11 @@ app.post('/unsave-module', authenticateToken, async (req, res) => {
       .eq('module_id', module_id);
 
     if (error) {
-      console.error('❌ Unsave module error:', error);
       throw error;
     }
 
-    console.log('✅ Module unsaved successfully');
-
     res.status(200).json({ message: 'Module unsaved successfully' });
   } catch (error) {
-    console.error('❌ Unsave module error:', error);
     res.status(500).json({ error: 'Failed to unsave module: ' + error.message });
   }
 });
@@ -1251,8 +1151,6 @@ app.get('/api/analytics/:userId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    console.log('📊 Fetching analytics for user:', userId);
-
     const [
       { count: modulesUploaded },
       { count: modulesSaved }
@@ -1261,14 +1159,11 @@ app.get('/api/analytics/:userId', authenticateToken, async (req, res) => {
       supabase.from('save_modules').select('*', { count: 'exact', head: true }).eq('user_id', userId)
     ]);
 
-    console.log('✅ Analytics retrieved:', { modulesUploaded, modulesSaved });
-
     res.status(200).json({
       modulesUploaded: modulesUploaded || 0,
       modulesSaved: modulesSaved || 0
     });
   } catch (error) {
-    console.error('❌ Analytics error:', error);
     res.status(500).json({ error: 'Failed to get analytics: ' + error.message });
   }
 });
@@ -1282,15 +1177,15 @@ app.post('/api/debug/user-info', async (req, res) => {
 
   try {
     const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-    
+
     if (usersError) {
       throw usersError;
     }
 
     const user = users.find(u => u.email === email.trim().toLowerCase());
-    
+
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         message: 'User not found in auth',
         searchedEmail: email.trim().toLowerCase(),
         totalUsers: users.length
@@ -1330,72 +1225,65 @@ app.post('/api/debug/user-info', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Debug user info error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to get debug info',
-      details: error.message 
+      details: error.message
     });
   }
 });
 
 app.post('/api/fix-null-profiles', async (req, res) => {
   try {
-    console.log('🔧 Starting to fix NULL profiles...');
-    
     const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
     if (usersError) throw usersError;
 
+    // ✅ FIXED: Changed 'fullName.is.null,fullName.eq.' to 'fullname.is.null,fullname.eq.'
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
-      .or('fullName.is.null,fullName.eq.');
-    
+      .or('fullname.is.null,fullname.eq.');
+
     if (profilesError) throw profilesError;
 
     let fixedCount = 0;
 
     for (const profile of profiles) {
       const authUser = users.find(u => u.id === profile.id);
-      
+
       if (authUser) {
         const userMetadata = authUser.user_metadata || {};
-        
-        let fullName = userMetadata.full_name || 
+
+        let fullname = userMetadata.full_name ||
                       userMetadata.name;
-        
-        if (!fullName && authUser.email) {
+
+        if (!fullname && authUser.email) {
           const emailPart = authUser.email.split('@')[0];
-          fullName = emailPart.split('.').map(part => 
+          fullname = emailPart.split('.').map(part =>
             part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
           ).join(' ');
         }
 
-        const username = userMetadata.first_name || 
-                        fullName?.split(' ')[0] || 
+        const username = userMetadata.first_name ||
+                        fullname?.split(' ')[0] ||
                         authUser.email?.split('@')[0];
 
-        if (fullName) {
+        if (fullname) {
           const { error: updateError } = await supabase
             .from('profiles')
             .update({
-              fullName: fullName,
+              fullname: fullname,   // ✅ FIXED: Changed from fullName
               username: username,
-              pfpUrl: userMetadata.avatar_url || profile.pfpUrl || '',
+              pfpurl: userMetadata.avatar_url || profile.pfpurl || '', // ✅ FIXED: Changed from pfpUrl
               updated_at: new Date().toISOString()
             })
             .eq('id', profile.id);
 
           if (!updateError) {
             fixedCount++;
-            console.log(`✅ Fixed profile for ${authUser.email}: ${fullName}`);
-          } else {
-            console.error(`❌ Failed to fix profile for ${authUser.email}:`, updateError);
           }
         }
       }
     }
-
-    console.log(`🎉 Successfully fixed ${fixedCount} profiles`);
 
     res.status(200).json({
       message: `Successfully fixed ${fixedCount} NULL profiles`,
@@ -1404,10 +1292,9 @@ app.post('/api/fix-null-profiles', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Fix NULL profiles error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fix NULL profiles',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -1459,20 +1346,19 @@ app.get('/debug/table-structure', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Debug error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/', (req, res) => {
   res.json({
-    message: '✅ EduRetrieve backend is running!',
-    version: '2.2.0-auth-fixed',
+    message: 'EduRetrieve backend is running!',
+    version: '2.3.1-column-names-fixed',
     timestamp: new Date().toISOString(),
-    status: 'Authentication and client-side function issues resolved',
+    status: 'Column name mismatches resolved - fullName->fullname, pfpUrl->pfpurl',
     endpoints: [
       'POST /api/auth/google/signup - Initiate Google OAuth signup',
-      'POST /api/auth/google/callback - Handle Google OAuth callback', 
+      'POST /api/auth/google/callback - Handle Google OAuth callback',
       'POST /api/auth/verify-signup-code - Complete signup with verification code',
       'POST /api/auth/check-verification-status - Check verification status',
       'POST /api/auth/check-user-status - Check user status',
@@ -1480,35 +1366,44 @@ app.get('/', (req, res) => {
       'POST /api/generate-content - Generate AI content',
       'GET /api/protected-data - Test protected route',
       'POST /upload-module - Upload module',
-      'GET /get-modules - Get all modules',
-      'GET /get-my-modules - Get user\'s own modules',
+      'GET /get-modules - Get user\'s own modules (use ?show_all=true for all)',
+      'GET /browse-all-modules - Browse all public modules',
+      'GET /get-my-modules - Get user\'s own modules (dedicated endpoint)',
       'GET /get-saved-modules - Get saved modules',
-      'POST /api/save-module - Save a module (FIXED)',
-      'POST /api/unsave-module - Unsave a module (FIXED)',
+      'POST /api/save-module - Save a module',
+      'POST /api/unsave-module - Unsave a module',
       'POST /save-module - Save a module (legacy endpoint)',
       'POST /unsave-module - Unsave a module (legacy endpoint)',
       'GET /get-user-profile - Get user profile',
       'POST /sync-user-profile - Update user profile',
       'DELETE /delete-module/:id - Delete module',
-      'GET /api/analytics/:userId - Get user analytics (FIXED)',
+      'GET /api/analytics/:userId - Get user analytics',
       'GET /debug/table-structure - Debug table structure'
+    ],
+    fixes_applied: [
+      'All fullName references changed to fullname',
+      'All pfpUrl references changed to pfpurl',
+      'Database column names now match code references',
+      'Profile creation and updates should work correctly'
     ]
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-  console.log(`🔐 Google OAuth Client ID: ${process.env.GOOGLE_CLIENT_ID ? 'configured' : 'missing'}`);
-  console.log(`📧 Gmail configured: ${process.env.GMAIL_USER || 'judeserafica@gmail.com'}`);
-  console.log(`🗄️ Supabase: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'}`);
+  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Google OAuth Client ID: ${process.env.GOOGLE_CLIENT_ID ? 'configured' : 'missing'}`);
+  console.log(`Gmail configured: ${process.env.GMAIL_USER || 'judeserafica@gmail.com'}`);
+  console.log(`Supabase: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'}`);
   console.log('');
-  console.log('🔧 FIXES APPLIED:');
-  console.log('   ✅ Removed client-side functions (saveModule, unsaveModule) from server code');
-  console.log('   ✅ Fixed authentication middleware placement');
-  console.log('   ✅ Enhanced analytics endpoint logging');
-  console.log('   ✅ Improved error handling for authorization headers');
+  console.log('FIXES APPLIED:');
+  console.log('   ✅ All fullName references changed to fullname');
+  console.log('   ✅ All pfpUrl references changed to pfpurl');
+  console.log('   ✅ Database column names now match code references');
+  console.log('   ✅ Profile creation and updates should work correctly');
+  console.log('   ✅ SELECT queries use correct column names');
+  console.log('   ✅ INSERT and UPDATE operations use correct column names');
   console.log('');
-  console.log('📍 Available endpoints:');
+  console.log('Available endpoints:');
   console.log('   Authentication:');
   console.log('     POST /api/auth/google/signup');
   console.log('     POST /api/auth/google/callback');

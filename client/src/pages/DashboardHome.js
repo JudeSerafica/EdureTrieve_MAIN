@@ -12,6 +12,9 @@ function Dashboard() {
   const [moduleToDelete, setModuleToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOption, setSortOption] = useState('latest');
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -327,31 +330,63 @@ function Dashboard() {
       </div>
     );
   }
-  
+
+  const filteredModules = modules
+  .filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()))
+  .sort((a, b) => {
+    if (sortOption === 'alphabetical') return a.title.localeCompare(b.title);
+    return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+  });
+
   return (
     <div className="dashboard-page">
-      <h2>Available Modules</h2>
-      <div className="scrollable-module-area"></div>
+      <div className="dashboard-headers-wrapper">
+    <div className="dashboard-headers">
+    <h2><span role="img" aria-label="modules">📘</span> Available Modules</h2>
+    <div className="module-controls">
+      <input
+        type="text"
+        placeholder="🔍 Search modules..."
+        className="search-bar"
+        value={searchTerm}
+        onChange={e => setSearchTerm(e.target.value)}
+      />
+      <select 
+        onChange={e => setSortOption(e.target.value)} 
+        className="sort-dropdown"
+        value={sortOption}
+      >
+        <option value="latest">Newest First</option>
+        <option value="alphabetical">A–Z</option>
+      </select>
+      <button onClick={() => setShowUploadModal(true)} className="floating-upload-button">
+        ＋Upload   Module
+      </button>
+</div>
+</div>
+      <div className="dashboard-divider"></div>
+</div>
+    
       <div className="module-list">
-        {modules.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px', color: '#666' }}>
-            <p>No modules available yet.</p>
-            <p>Click the "Upload New Module" button to add the first module!</p>
-          </div>
-        ) : (
-          modules.map((module) => (
-            <div key={module.id} className="module-card">
-              <div className="module-card-header">
-                <h3>{module.title}</h3>
-                <button
-                  onClick={() => handleToggleSave(module.id, module.title)}
-                  className="save-module-button"
-                >
-                  <FaRegBookmark
-                    className={`save-icon ${savedModuleIds.has(module.id) ? 'saved' : 'unsaved'}`}
-                  />
-                </button>
-              </div>
+        {filteredModules.map((module) => (
+          <div key={module.id} className="module-card">
+            <div className="module-card-header">
+              <h3
+                onClick={() => window.location.href = `/module/${module.id}`}
+                className="module-title"
+              >
+                {module.title}
+              </h3>
+              <button
+                onClick={() => handleToggleSave(module.id, module.title)}
+                className="save-module-button"
+                title={savedModuleIds.has(module.id) ? 'Remove Bookmark' : 'Save to Bookmarks'}
+              >
+                <FaRegBookmark
+                  className={`save-icon ${savedModuleIds.has(module.id) ? 'saved' : 'unsaved'}`}
+                />
+              </button>
+            </div>
 
               <div className="module-card-content">
                 <p><strong>Outline:</strong></p>
@@ -395,13 +430,9 @@ function Dashboard() {
                 </button>
               </div>
             </div>
-          ))
+        )
         )}
       </div>
-
-      <button onClick={() => setShowUploadModal(true)} className="floating-upload-button">
-        ＋Upload New Module
-      </button>
     
       {showUploadModal && (
         <div className="modals-overlay">
@@ -471,99 +502,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .file-actions {
-          display: flex;
-          gap: 10px;
-          margin: 15px 0;
-          flex-wrap: wrap;
-        }
-
-        .view-file-button {
-          background-color: #007bff;
-          color: white;
-          border: none;
-          padding: 10px 15px;
-          border-radius: 6px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 500;
-          transition: all 0.3s ease;
-          box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
-        }
-
-        .view-file-button:hover {
-          background-color: #0056b3;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-        }
-
-        .download-file-button {
-          background-color: #28a745;
-          color: white;
-          border: none;
-          padding: 10px 15px;
-          border-radius: 6px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 500;
-          transition: all 0.3s ease;
-          box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
-        }
-
-        .download-file-button:hover {
-          background-color: #218838;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
-        }
-
-        .upload-progress {
-          margin: 15px 0;
-        }
-
-        .progress-bar {
-          width: 100%;
-          height: 20px;
-          background-color: #f0f0f0;
-          border-radius: 10px;
-          overflow: hidden;
-        }
-
-        .progress-fill {
-          height: 100%;
-          background-color: #007bff;
-          transition: width 0.3s ease;
-        }
-
-        .upload-progress p {
-          text-align: center;
-          margin-top: 5px;
-          font-weight: bold;
-        }
-
-        .module-card-content p strong {
-          color: #333;
-        }
-
-        @media (max-width: 600px) {
-          .file-actions {
-            flex-direction: column;
-          }
-          
-          .view-file-button,
-          .download-file-button {
-            width: 100%;
-            justify-content: center;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import useAuthStatus from '../hooks/useAuthStatus';
-import { FaBookmark, FaDownload } from 'react-icons/fa';
+import { FaBookmark, FaDownload, FaEye} from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 function Saves() {
@@ -9,6 +9,9 @@ function Saves() {
   const [savedModules, setSavedModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState('recent');
 
   useEffect(() => {
     if (authLoading) {
@@ -181,22 +184,55 @@ function Saves() {
     }
   };
 
+  const filteredModules = savedModules
+    .filter((module) => module.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      if (sortOption === 'recent') {
+        return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+      } else if (sortOption === 'title') {
+        return a.title.localeCompare(b.title);
+      }
+      return 0;
+    });
+
   if (authLoading) return <div className="dashboard-loading">Checking authentication...</div>;
   if (!user) return <div className="dashboard-not-logged-in">Please log in to view your saved modules.</div>;
 
   return (
     <div className="dashboard-content-page">
+      <div className="dashboard-headers-wrapper">
+        <div className="dashboard-headers">
       <h2>📚 My Saved Modules</h2>
+      <div className="module-controls">
+        <input
+          type="text"
+          placeholder="🔍 Search modules..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-bar"
+        />
+        <select
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value)}
+          className="sort-dropdown"
+        >
+          <option value="recent">Sort by Recent</option>
+          <option value="title">Sort by Title</option>
+        </select>
+      </div>
+      </div>
+           <div className="dashboard-divider"></div>
+      </div>
 
       {loading && <div className="dashboard-loading">Loading modules...</div>}
       {error && <div className="dashboard-error">{error}</div>}
-      {!loading && savedModules.length === 0 && (
+      {!loading && filteredModules.length === 0 && (
         <div className="dashboard-empty">You haven't saved any modules yet.</div>
       )}
 
       <div className="module-list">
-        {savedModules.map((module) => (
-          <div key={module.id} className="module-card">
+        {filteredModules.map((module) => (
+          <div key={module.id} className="module-card hoverable">
             <div className="module-card-header">
               <h3>{module.title}</h3>
               <button
@@ -207,6 +243,12 @@ function Saves() {
                 <FaBookmark className="saved-icon" />
               </button>
             </div>
+
+            {loading && <div className="dashboard-loading">Loading modules...</div>}
+      {error && <div className="dashboard-error">{error}</div>}
+      {!loading && savedModules.length === 0 && (
+        <div className="dashboard-empty">You haven't saved any modules yet.</div>
+      )}
             <p><strong>Outline:</strong></p>
             <p className="module-description">{module.description}</p>
 
@@ -216,7 +258,7 @@ function Saves() {
                   className="view-file-button"
                   onClick={() => window.open(module.file_url, '_blank')}
                 >
-                  📄 View File
+                  <FaEye /> View File
                 </button>
                 <button
                   className="download-file-button"

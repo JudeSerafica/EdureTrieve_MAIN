@@ -55,7 +55,7 @@ export const generateUniqueId = () =>
 // 💾 LocalStorage Constants
 // ------------------------
 
-const CHAT_KEY = 'eduretrieve_chat_sessions';
+const getUserChatKey = (userId) => `eduretrieve_chat_sessions_${userId}`;
 
 // ------------------------
 // 📂 Load Chat Sessions
@@ -64,9 +64,9 @@ const CHAT_KEY = 'eduretrieve_chat_sessions';
 /**
  * Loads chat history sessions from localStorage.
  */
-export const fetchChatHistoryApi = async () => {
+export const fetchChatHistoryApi = async (user) => {
   try {
-    const raw = localStorage.getItem(CHAT_KEY);
+    const raw = localStorage.getItem(getUserChatKey(user.id));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed)
       ? parsed.map((s) => ({ ...s, messages: s.messages || [] }))
@@ -85,7 +85,7 @@ export const fetchChatHistoryApi = async () => {
  * Saves a new prompt-response pair to localStorage under the given session.
  */
 export const saveChatEntryApi = async (user, { prompt, response, conversationId, timestamp }) => {
-  let sessions = await fetchChatHistoryApi();
+  let sessions = await fetchChatHistoryApi(user);
 
   const newMessages = [
     { type: 'user', text: prompt, timestamp },
@@ -104,7 +104,7 @@ export const saveChatEntryApi = async (user, { prompt, response, conversationId,
     });
   }
 
-  localStorage.setItem(CHAT_KEY, JSON.stringify(sessions));
+  localStorage.setItem(getUserChatKey(user.id), JSON.stringify(sessions));
 };
 
 // ------------------------
@@ -115,9 +115,9 @@ export const saveChatEntryApi = async (user, { prompt, response, conversationId,
  * Deletes a chat session by its ID from localStorage.
  */
 export const deleteChatSessionApi = async (user, sessionId) => {
-  const sessions = await fetchChatHistoryApi();
+  const sessions = await fetchChatHistoryApi(user);
   const updated = sessions.filter((s) => s.id !== sessionId);
-  localStorage.setItem(CHAT_KEY, JSON.stringify(updated));
+  localStorage.setItem(getUserChatKey(user.id), JSON.stringify(updated));
   return { message: 'Session deleted locally' };
 };
 
@@ -128,7 +128,7 @@ export const deleteChatSessionApi = async (user, sessionId) => {
 /**
  * Sends a prompt to the backend AI API and returns the generated response.
  */
-export const generateContentApi = async (user, prompt) => {
+export const generateContentApi = async (user, prompt, conversationId) => {
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('Invalid prompt');
   }
@@ -146,19 +146,17 @@ export const generateContentApi = async (user, prompt) => {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({
+      prompt,
+      userId: user.id,
+      conversationId,
+    }),
   });
 
+  const result = await res.json();
   if (!res.ok) {
-    let errorMessage = 'Something went wrong generating content.';
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.error || errorData.message || errorMessage;
-    } catch {
-      console.warn('⚠️ Could not parse error JSON from /generate-content');
-    }
-    throw new Error(errorMessage);
+    throw new Error(result.error || 'Failed to generate content');
   }
 
-  return await res.json(); // Expects: { generatedContent: "..." }
+  return result;
 };
