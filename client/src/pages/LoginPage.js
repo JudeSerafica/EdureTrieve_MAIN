@@ -39,25 +39,6 @@ function LoginPage() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-const handleGoogleSignup = async () => {
-  try {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard/home`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      }
-    });
-
-    if (error) throw error;
-  } catch (error) {
-    setError('Google signup failed: ' + error.message);
-  }
-};
-
   const syncUserProfile = async (user) => {
     try {
       const { data: existingProfile } = await supabase
@@ -138,7 +119,7 @@ const handleGoogleSignup = async () => {
   setLoading(true);
 
   try {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/dashboard/home`
@@ -295,129 +276,6 @@ const handleGoogleSignup = async () => {
           Don't have an account? <Link to="/signup">Sign up here</Link>
         </p>
       </div>
-
-      <style jsx>{`
-        .auth-divider {
-          text-align: center;
-          margin: 20px 0;
-          position: relative;
-        }
-
-        .auth-divider::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 0;
-          right: 0;
-          height: 1px;
-          background-color: #ddd;
-        }
-
-        .auth-divider span {
-          background-color: white;
-          padding: 0 15px;
-          color: #666;
-          font-size: 14px;
-        }
-
-        .google-login-button {
-          width: 100%;
-          padding: 12px;
-          background-color: #4285f4;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-size: 16px;
-          margin-bottom: 15px;
-        }
-
-        .google-login-button:hover:not(:disabled) {
-          background-color: #357ae8;
-        }
-
-        .google-login-button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .link-button {
-          background: none;
-          border: none;
-          color: #007bff;
-          text-decoration: underline;
-          cursor: pointer;
-          font-size: inherit;
-          padding: 0;
-        }
-
-        .link-button:hover:not(:disabled) {
-          color: #0056b3;
-        }
-
-        .verification-section {
-          background-color: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 5px;
-          padding: 15px;
-          margin: 15px 0;
-          text-align: center;
-        }
-
-        .verification-text {
-          margin: 0 0 10px 0;
-          font-size: 14px;
-          color: #666;
-        }
-
-        .resend-button {
-          background-color: #28a745;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-
-        .resend-button:hover:not(:disabled) {
-          background-color: #218838;
-        }
-
-        .auth-message {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px;
-          border-radius: 5px;
-          margin: 15px 0;
-          font-size: 14px;
-        }
-
-        .auth-message.error {
-          background-color: #f8d7da;
-          border: 1px solid #f5c6cb;
-          color: #721c24;
-        }
-
-        .error-icon {
-          font-size: 16px;
-        }
-
-        .auth-link {
-          text-align: center;
-          margin-top: 20px;
-        }
-
-        .auth-link a {
-          color: #007bff;
-          text-decoration: none;
-        }
-
-        .auth-link a:hover {
-          text-decoration: underline;
-        }
-      `}</style>
     </div>
   );
 }

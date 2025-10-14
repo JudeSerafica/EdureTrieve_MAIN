@@ -6,7 +6,7 @@ function HomePageContent() {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: '92vh',
+    minHeight: '92.2vh',
     padding: '2rem',
     textAlign: 'center',
     backgroundColor: '#0e1628',

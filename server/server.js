@@ -14,8 +14,14 @@ const app = express();
 const upload = multer();
 const PORT = process.env.PORT || 5000;
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy-key');
+// Initialize Gemini AI (FIXED: force v1 + explicit baseUrl)
+const apiKey = process.env.GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY || 'dummy-key';
+const genAI = new GoogleGenerativeAI({
+  apiKey,
+  apiVersion: 'v1',
+  baseUrl: 'https://generativelanguage.googleapis.com'
+});
+console.log('🔍 Gemini client initialized. API key set?', apiKey && apiKey !== 'dummy-key');
 
 // Google OAuth2 Client Setup - FIXED REDIRECT URI
 const googleClient = new OAuth2Client(
@@ -67,12 +73,31 @@ const generateVerificationCode = () => {
 // Generate content using Gemini
 const generateContent = async (prompt, retries = 3) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    console.log('🤖 Generating content for prompt:', prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''));
+
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'dummy-key') {
+      console.error('❌ GEMINI_API_KEY is not configured or is dummy-key');
+      throw new Error('Gemini API key is not configured');
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+    console.log('🔧 Using Gemini model: gemini-1.5-pro-latest');
+
     const result = await model.generateContent(prompt);
-    return result.response.text();
+    const response = result.response.text();
+
+    console.log('✅ AI Response received:', response ? 'Length: ' + response.length : 'EMPTY RESPONSE!');
+
+    if (!response || response.trim().length === 0) {
+      console.error('❌ Empty response from Gemini API');
+      throw new Error('Empty response from AI');
+    }
+
+    return response;
   } catch (error) {
     console.error("❌ Gemini API error:", error.message || error);
-    throw new Error("Failed to generate content from AI.");
+    console.error('Stack trace:', error.stack);
+    throw new Error("Failed to generate content from AI: " + error.message);
   }
 };
 
@@ -498,24 +523,17 @@ app.post('/api/generate-content', async (req, res) => {
   }
 
   try {
+    console.log('🚀 API Request received:', { prompt: prompt.substring(0, 50) + '...', userId, conversationId });
+
     // 🧠 Generate content using Gemini (or other LLM)
     const content = await generateContent(prompt);
 
-    // 🧾 (Optional) Save chat to your database — if you're storing conversation history
-    // await supabase.from('chat_messages').insert([
-    //   {
-    //     user_id: userId,
-    //     conversation_id: conversationId,
-    //     prompt: prompt,
-    //     response: content,
-    //     created_at: new Date().toISOString()
-    //   }
-    // ]);
+    console.log('📤 Sending response back to client:', { contentLength: content ? content.length : 0 });
 
     res.status(200).json({ generatedContent: content });
   } catch (error) {
-    console.error('❌ Gemini API Error:', error);
-    res.status(503).json({ error: 'Failed to generate content. Please try again later.' });
+    console.error('❌ API Error:', error.message);
+    res.status(503).json({ error: 'Failed to generate content. Please try again later.', details: error.message });
   }
 });
 

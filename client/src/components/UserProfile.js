@@ -121,7 +121,6 @@ function UserProfile({ user }) {
   return (
     <div className="profile-panel">
       <h4>Your Profile</h4>
-
       <div className="profile-pfp-section">
         {pfpUrl ? (
           <img src={pfpUrl} alt="Profile" className="profile-pfp" />

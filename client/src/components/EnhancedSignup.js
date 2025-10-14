@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 
 const EnhancedSignup = () => {
   const [email, setEmail] = useState('');
@@ -165,22 +164,13 @@ const EnhancedSignup = () => {
       }
 
       if (result.session) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: result.session.access_token,
-          refresh_token: result.session.refresh_token,
-        });
+  setStep("completed");
+  setMessage("Signup completed successfully! Redirecting to login...");
 
-        if (sessionError) {
-          console.warn('Session set warning:', sessionError.message);
-        }
-      }
-
-      setStep('completed');
-      setMessage('Signup completed successfully! Redirecting to dashboard...');
-      
-      setTimeout(() => {
-        navigate('/dashboard/home');
-      }, 2000);
+  setTimeout(() => {
+    navigate("/login");
+  }, 2000);
+}
 
     } catch (err) {
       console.error('Verification error:', err);

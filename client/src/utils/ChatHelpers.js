@@ -129,8 +129,18 @@ export const deleteChatSessionApi = async (user, sessionId) => {
  * Sends a prompt to the backend AI API and returns the generated response.
  */
 export const generateContentApi = async (user, prompt, conversationId) => {
+  console.log('ChatHelpers.js: generateContentApi called with:', {
+    userId: user?.id,
+    prompt: prompt?.substring(0, 50) + '...',
+    conversationId
+  });
+
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('Invalid prompt');
+  }
+
+  if (!conversationId) {
+    throw new Error('conversationId is required');
   }
 
   const { data, error } = await supabase.auth.getSession();

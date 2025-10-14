@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Outlet } from 'react-router-dom';
-import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { supabase } from '../supabaseClient';
 import '../styles/App.css';
@@ -64,9 +63,8 @@ function DashboardLayout() {
 
   return (
     <div className="dashboard-layout">
-      <Header user={user} />
       <div className="dashboard-content-wrapper">
-        <Sidebar onLogout={handleLogout} />
+        <Sidebar onLogout={handleLogout} user={user} />
         <main className="dashboard-main-content">
           <Outlet />
         </main>

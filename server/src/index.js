@@ -6,7 +6,7 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 
@@ -14,7 +14,9 @@ const app = express();
 const upload = multer();
 const PORT = process.env.PORT || 5000;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy-key');
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -50,9 +52,17 @@ const generateVerificationCode = () => {
 
 const generateContent = async (prompt, retries = 3) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      model: "llama-3.1-8b-instant", // Fast and free model
+    });
+
+    return chatCompletion.choices[0]?.message?.content || "";
   } catch (error) {
     throw new Error("Failed to generate content from AI.");
   }
@@ -662,17 +672,62 @@ app.post('/api/auth/check-verification-status', (req, res) => {
 });
 
 app.post('/api/generate-content', async (req, res) => {
-  const { prompt } = req.body;
+  console.log('Server: /api/generate-content received request body:', {
+    prompt: req.body.prompt?.substring(0, 50) + '...' || 'MISSING',
+    userId: req.body.userId || 'MISSING',
+    conversationId: req.body.conversationId || 'MISSING',
+    hasPrompt: !!req.body.prompt,
+    hasUserId: !!req.body.userId,
+    hasConversationId: !!req.body.conversationId
+  });
 
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required.' });
+  const { prompt, userId, conversationId } = req.body;
+
+  if (!prompt || !userId || !conversationId) {
+    console.log('Server: Validation failed - missing required fields');
+    return res.status(400).json({ error: 'Prompt, userId, and conversationId are required.' });
   }
 
   try {
-    const content = await generateContent(prompt);
-    res.status(200).json({ generatedContent: content });
+    console.log('🚀 API Request received:', { prompt: prompt.substring(0, 50) + '...', userId, conversationId });
+
+    console.log('🔑 GROQ_API_KEY status:', {
+      exists: !!process.env.GROQ_API_KEY,
+      length: process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.length : 0,
+      startsWith: process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 10) + '...' : 'N/A'
+    });
+
+    if (!process.env.GROQ_API_KEY) {
+      console.error('❌ GROQ_API_KEY is not configured');
+      throw new Error('Groq API key is not configured');
+    }
+
+    console.log('🔧 Using Groq model: llama-3.1-8b-instant');
+
+    console.log('📡 Calling generateContent function...');
+    const response = await generateContent(prompt);
+
+    console.log('✅ AI Response received:', response ? 'Length: ' + response.length : 'EMPTY RESPONSE!');
+    console.log('📝 Response preview:', response ? response.substring(0, 100) + '...' : 'N/A');
+
+    if (!response || response.trim().length === 0) {
+      console.error('❌ Empty response from Gemini API');
+      throw new Error('Empty response from AI');
+    }
+
+    console.log('📤 Sending response back to client:', { contentLength: response ? response.length : 0 });
+
+    res.status(200).json({ generatedContent: response });
   } catch (error) {
-    res.status(503).json({ error: 'Failed to generate content. Please try again later.' });
+    console.error('❌ API Error:', error.message);
+    console.error('❌ Error details:', {
+      name: error.name,
+      code: error.code,
+      status: error.status,
+      response: error.response?.data || 'No response data',
+      stack: error.stack
+    });
+    res.status(503).json({ error: 'Failed to generate content. Please try again later.', details: error.message });
   }
 });
 
@@ -868,6 +923,7 @@ app.get('/get-modules', authenticateToken, async (req, res) => {
   }
 });
 
+// ✅ Get user profile
 app.get('/get-user-profile', authenticateToken, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -879,23 +935,32 @@ app.get('/get-user-profile', authenticateToken, async (req, res) => {
     if (error && error.code !== 'PGRST116') throw error;
 
     res.status(200).json({
-      profile: data || {
-        id: req.user.id,
-        email: req.user.email,
-        username: '',
-        fullname: '', // ✅ FIXED: Changed from fullName to fullname
-        pfpurl: ''   // ✅ FIXED: Changed from pfpUrl to pfpurl
-      }
+      profile: data
+        ? {
+            id: data.id,
+            email: data.email,
+            username: data.username,
+            fullName: data.fullname, // map snake_case → camelCase
+            pfpUrl: data.pfpurl      // map snake_case → camelCase
+          }
+        : {
+            id: req.user.id,
+            email: req.user.email,
+            username: '',
+            fullName: '',
+            pfpUrl: ''
+          }
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get profile' });
   }
 });
 
+
+// ✅ Sync user profile
 app.post('/sync-user-profile', authenticateToken, async (req, res) => {
   try {
-    // ✅ FIXED: Changed fullName to fullname, pfpUrl to pfpurl in request body
-    const { username, fullname, pfpurl } = req.body;
+    const { username, fullName, pfpUrl } = req.body; // camelCase from frontend
 
     const { data, error } = await supabase
       .from('profiles')
@@ -903,22 +968,30 @@ app.post('/sync-user-profile', authenticateToken, async (req, res) => {
         id: req.user.id,
         email: req.user.email,
         username: username || '',
-        fullname: fullname || '', // ✅ FIXED: Changed from fullName
-        pfpurl: pfpurl || '',     // ✅ FIXED: Changed from pfpUrl
+        fullname: fullName || '', // save to DB as snake_case
+        pfpurl: pfpUrl || '',     // save to DB as snake_case
         updated_at: new Date().toISOString()
       })
       .select();
 
     if (error) throw error;
 
+    // return camelCase to frontend
     res.status(200).json({
       message: 'Profile updated successfully',
-      profile: data[0]
+      profile: {
+        id: data[0].id,
+        email: data[0].email,
+        username: data[0].username,
+        fullName: data[0].fullname,
+        pfpUrl: data[0].pfpurl
+      }
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to sync profile' });
   }
 });
+
 
 app.delete('/delete-module/:moduleId', authenticateToken, async (req, res) => {
   try {
@@ -1151,17 +1224,18 @@ app.get('/api/analytics/:userId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const [
-      { count: modulesUploaded },
-      { count: modulesSaved }
-    ] = await Promise.all([
+    const [uploadedRes, savedRes] = await Promise.all([
       supabase.from('modules').select('*', { count: 'exact', head: true }).eq('user_id', userId),
       supabase.from('save_modules').select('*', { count: 'exact', head: true }).eq('user_id', userId)
     ]);
 
+    if (uploadedRes.error || savedRes.error) {
+      throw new Error(uploadedRes.error?.message || savedRes.error?.message);
+    }
+
     res.status(200).json({
-      modulesUploaded: modulesUploaded || 0,
-      modulesSaved: modulesSaved || 0
+      modulesUploaded: uploadedRes.count || 0,
+      modulesSaved: savedRes.count || 0
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get analytics: ' + error.message });

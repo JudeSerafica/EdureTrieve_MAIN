@@ -53,32 +53,49 @@ function Chats() {
     setError('');
   }, [activeChatMessages, activeSessionId]);
 
-  useEffect(() => {
-    const loadInitialChatHistory = async () => {
-      if (user && !authLoading) {
-        try {
-          const sessions = await fetchChatHistoryApi(user);
-          setChatHistorySessions(sessions);
-          if (sessions.length > 0) {
-            setActiveChatMessages(sessions[0].messages);
-            setActiveSessionId(sessions[0].id);
-          } else {
-            handleNewChat();
-          }
-        } catch (err) {
-          console.error('Error loading initial chat history:', err);
-          setError(err.message || 'Failed to load chat history.');
-          handleNewChat();
-        }
-      } else if (!user && !authLoading) {
-        setChatHistorySessions([]);
-        setActiveChatMessages([]);
-        setActiveSessionId(null);
-      }
-    };
+ useEffect(() => {
+  let isMounted = true;
 
-    loadInitialChatHistory();
-  }, [user, authLoading]);
+  const loadInitialChatHistory = async () => {
+    if (user && !authLoading) {
+      try {
+        const sessions = await fetchChatHistoryApi(user);
+        if (!isMounted) return;
+
+        setChatHistorySessions(sessions);
+
+        if (sessions.length > 0) {
+          setActiveChatMessages(sessions[0].messages);
+          setActiveSessionId(sessions[0].id);
+        } else {
+          // 🚨 Instead of calling handleNewChat directly
+          const newSessionId = generateUniqueId();
+          setChatHistorySessions([{
+            id: newSessionId,
+            title: "New Chat",
+            messages: []
+          }]);
+          setActiveSessionId(newSessionId);
+          setActiveChatMessages([]);
+          setPrompt("");
+          setError("");
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error("Error loading initial chat history:", err);
+        setError(err.message || "Failed to load chat history.");
+      }
+    } else if (!user && !authLoading) {
+      setChatHistorySessions([]);
+      setActiveChatMessages([]);
+      setActiveSessionId(null);
+    }
+  };
+
+  loadInitialChatHistory();
+  return () => { isMounted = false; };
+}, [user, authLoading]); // 👈 removed handleNewChat
+
 
   useEffect(() => {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -121,7 +138,12 @@ function Chats() {
     setActiveChatMessages(prev => [...prev, newUserMessage]);
 
     try {
-      const generateData = await generateContentApi(user, currentPrompt);
+      console.log('Chats.js: Calling generateContentApi with:', {
+        userId: user?.id,
+        prompt: currentPrompt?.substring(0, 50) + '...',
+        conversationId: currentConversationId
+      });
+      const generateData = await generateContentApi(user, currentPrompt, currentConversationId);
       const newResponse = generateData.generatedContent;
 
       const newAiMessage = {

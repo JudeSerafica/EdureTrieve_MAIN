@@ -107,6 +107,26 @@ function LoginPage() {
     }
   };
 
+  const handleGoogleSignup = async () => {
+  try {
+    // eslint-disable-next-line no-unused-vars
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard/home`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
+      }
+    });
+
+    if (error) throw error;
+  } catch (error) {
+    setError('Google signup failed: ' + error.message);
+  }
+};
+
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
@@ -115,9 +135,13 @@ function LoginPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard/home`,
-        },
-      });
+        redirectTo: `${window.location.origin}/dashboard/home`,
+        queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+    }
+  }
+});
 
       if (error) {
         setError('Google login failed: ' + error.message);

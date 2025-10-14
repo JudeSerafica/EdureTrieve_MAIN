@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { FaRegBookmark, FaDownload, FaEye } from 'react-icons/fa';
+import { FaRegBookmark, FaDownload, FaEye,} from 'react-icons/fa';
 import useAuthStatus from '../hooks/useAuthStatus';
 import { toast } from 'react-toastify';
+import FileViewer from "../components/FileViewer";
 
 function Dashboard() {
   const { user, authLoading } = useAuthStatus();
   const [modules, setModules] = useState([]); 
   const [savedModuleIds, setSavedModuleIds] = useState(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCannotDeleteModal, setShowCannotDeleteModal] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +25,13 @@ function Dashboard() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [message, setMessage] = useState('');
 
+  const [showViewer, setShowViewer] = useState(false);
+  const [currentFileUrl, setCurrentFileUrl] = useState(null);
+  const [currentFileName, setCurrentFileName] = useState(null);
+
+  // Store file info state (size, type, pages)
+  const [fileInfo, setFileInfo] = useState({});
+
   useEffect(() => {
     if (authLoading || !user) return;
     console.log('✅ User ready:', user.id);
@@ -34,14 +43,26 @@ function Dashboard() {
         setLoading(true);
         console.log('🔍 Attempting to fetch modules...');
         
+        // Check if user is authenticated first
+        if (!user) {
+          console.log('⚠️ User not authenticated, skipping module fetch');
+          return;
+        }
+
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
         const token = session?.access_token;
-        if (!token) throw new Error('Missing token');
+        if (!token) {
+          console.error('❌ No valid session token found');
+          toast.error('Authentication expired. Please log in again.');
+          return;
+        }
 
-        const response = await fetch('http://localhost:5000/get-modules', {
+        console.log('🔑 Using token for authentication');
+
+        const response = await fetch(`http://localhost:5000/get-modules?user_id=${user.id}`, {
           method: 'GET',
           headers: { 
             'Authorization': `Bearer ${token}`,
@@ -50,6 +71,11 @@ function Dashboard() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            console.error('❌ Authentication failed - token may be expired');
+            toast.error('Authentication expired. Please log in again.');
+            return;
+          }
           throw new Error(`HTTP ${response.status}: Failed to fetch modules`);
         }
 
@@ -57,30 +83,39 @@ function Dashboard() {
         const modulesData = result.modules || [];
 
         console.log(`✅ Fetched ${modulesData.length} modules from backend`);
-        setModules(modulesData);
+
+        // Transform modules to show actual full names for all users
+        const transformedModules = modulesData.map(module => ({
+          ...module,
+          uploadedBy: module.uploadedBy || 'Unknown User'
+        }));
+
+        setModules(transformedModules);
 
       } catch (err) {
         console.error('❌ Error fetching modules:', err);
         toast.error('Failed to load modules: ' + err.message);
         
+        // Fallback to direct Supabase query
         try {
+          console.log('🔄 Attempting fallback to direct Supabase query...');
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('modules')
             .select('*')
+            .eq('user_id', user.id)
             .order('created_at', { ascending: false });
             
           if (!fallbackError && fallbackData) {
             const transformedData = fallbackData.map(module => ({
               ...module,
-              uploadedBy: module.uploaded_by?.includes('@') 
-                ? module.uploaded_by.split('@')[0].split('.').map(part => 
-                    part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-                  ).join(' ').toUpperCase()
-                : (module.uploaded_by || 'UNKNOWN USER').toUpperCase(),
+              uploadedBy: module.uploaded_by || 'Unknown User',
               uploadedAt: module.created_at
             }));
             setModules(transformedData);
-            console.log('✅ Fallback successful');
+            console.log('✅ Fallback successful - loaded', transformedData.length, 'modules');
+            toast.success('Modules loaded via fallback method');
+          } else {
+            console.error('❌ Fallback also failed:', fallbackError);
           }
         } catch (fallbackErr) {
           console.error('❌ Even fallback failed:', fallbackErr);
@@ -90,8 +125,13 @@ function Dashboard() {
       }
     };
 
-    fetchModules();
-  }, []);
+    // Only fetch modules if user is authenticated and not loading
+    if (!authLoading && user) {
+      fetchModules();
+    } else if (!authLoading && !user) {
+      setLoading(false);
+    }
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (!user) return;
@@ -116,11 +156,56 @@ function Dashboard() {
     fetchSaved();
   }, [user]);
 
+   const getFriendlyFileType = (mimeType, fileName = "") => {
+    const ext = fileName.split(".").pop().toLowerCase();
+    const map = {
+      pdf: "PDF",
+      doc: "DOC",
+      docx: "DOCX",
+      ppt: "PPT",
+      pptx: "PPTX",
+      txt: "TXT",
+    };
+    if (map[ext]) return map[ext];
+    if (!mimeType) return "FILE";
+    if (mimeType.includes("pdf")) return "PDF";
+    if (mimeType.includes("word")) return "DOCX";
+    if (mimeType.includes("presentation")) return "PPTX";
+    if (mimeType.includes("text")) return "TXT";
+    return "FILE";
+  };
+
+  const fetchFileInfo = useCallback(async (module) => {
+  if (!module?.file_url) return;
+
+  try {
+    const response = await fetch(module.file_url);
+    const blob = await response.blob();
+
+    const sizeMB = (blob.size / (1024 * 1024)).toFixed(2) + " MB";
+
+    const type = getFriendlyFileType(blob.type, module.file_name);
+
+    setFileInfo((prev) => ({
+      ...prev,
+      [module.id]: { size: sizeMB, type },
+    }));
+  } catch (err) {
+    console.error("Error fetching file info:", err);
+  }
+}, []);
+
+  useEffect(() => {
+  if (modules.length > 0) {
+    modules.forEach((m) => fetchFileInfo(m));
+  }
+}, [modules, fetchFileInfo]);
+
   const handleToggleSave = async (moduleId, moduleTitle) => {
     if (!user) {
       toast.warning('⚠️ You must be logged in to save modules.');
       return;
-    }
+    };
 
     const isSaved = savedModuleIds.has(moduleId);
     if (isSaved) {
@@ -147,18 +232,21 @@ function Dashboard() {
   };
 
   const handleDeleteClick = (id) => {
-    setModuleToDelete(id);
-    setShowDeleteModal(true);
+    // Check if the module is saved
+    if (savedModuleIds.has(id)) {
+      // Module is saved, show "cannot delete" modal
+      setShowCannotDeleteModal(true);
+    } else {
+      // Module is not saved, show regular delete confirmation modal
+      setModuleToDelete(id);
+      setShowDeleteModal(true);
+    }
   };
 
   const handleConfirmDelete = async () => {
     if (!moduleToDelete) return;
-
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
+      const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) throw new Error('Missing token');
 
@@ -173,12 +261,12 @@ function Dashboard() {
       }
 
       const result = await res.json();
-      
+      console.log('Delete response:', result);
+
       setModules(prev => prev.filter(m => m.id !== moduleToDelete));
       const updatedSaved = new Set(savedModuleIds);
       updatedSaved.delete(moduleToDelete);
       setSavedModuleIds(updatedSaved);
-
       toast.success('🗑️ Module deleted!');
     } catch (err) {
       console.error('❌ Delete error:', err.message);
@@ -189,7 +277,7 @@ function Dashboard() {
     }
   };
 
-  const handleUpload = async (e) => {
+      const handleUpload = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
@@ -241,7 +329,12 @@ function Dashboard() {
       const result = await res.json();
       console.log('✅ Upload successful:', result);
       
-      setModules(prev => [result.data, ...prev]);
+      // Add the new module with actual full name
+      const newModule = {
+        ...result.data,
+        uploadedBy: result.data.uploadedBy || 'Unknown User'
+      };
+      setModules(prev => [newModule, ...prev]);
       
       setUploadProgress(100);
       setMessage('✅ Module uploaded successfully!');
@@ -265,19 +358,15 @@ function Dashboard() {
     }
   };
 
-  const handleViewFile = async (fileUrl, fileName) => {
+
+  const handleViewFile = (fileUrl, fileName) => {
     if (!fileUrl) {
-      toast.error('No file available to view');
+      toast.error("No file available to view");
       return;
     }
-
-    try {
-      window.open(fileUrl, '_blank');
-      toast.success('📄 Opening file in new tab!');
-    } catch (err) {
-      console.error('❌ View file error:', err);
-      toast.error('Failed to open file');
-    }
+    setCurrentFileUrl(fileUrl);
+    setCurrentFileName(fileName);
+    setShowViewer(true);
   };
 
   const handleDownloadFile = async (fileUrl, fileName) => {
@@ -287,14 +376,21 @@ function Dashboard() {
     }
 
     try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error('Failed to fetch file');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
       const link = document.createElement('a');
-      link.href = fileUrl;
+      link.href = url;
       link.download = fileName || 'module-file';
-      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
       toast.success('📥 Download started!');
     } catch (err) {
       console.error('❌ Download error:', err);
@@ -332,40 +428,44 @@ function Dashboard() {
   }
 
   const filteredModules = modules
-  .filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()))
-  .sort((a, b) => {
-    if (sortOption === 'alphabetical') return a.title.localeCompare(b.title);
-    return new Date(b.uploadedAt) - new Date(a.uploadedAt);
-  });
+    .filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      if (sortOption === 'alphabetical') return a.title.localeCompare(b.title);
+      return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+    });
 
   return (
     <div className="dashboard-page">
-      <div className="dashboard-headers-wrapper">
-    <div className="dashboard-headers">
-    <h2><span role="img" aria-label="modules">📘</span> Available Modules</h2>
-    <div className="module-controls">
-      <input
-        type="text"
-        placeholder="🔍 Search modules..."
-        className="search-bar"
-        value={searchTerm}
-        onChange={e => setSearchTerm(e.target.value)}
-      />
-      <select 
-        onChange={e => setSortOption(e.target.value)} 
-        className="sort-dropdown"
-        value={sortOption}
-      >
-        <option value="latest">Newest First</option>
-        <option value="alphabetical">A–Z</option>
-      </select>
-      <button onClick={() => setShowUploadModal(true)} className="floating-upload-button">
-        ＋Upload   Module
-      </button>
-</div>
-</div>
-      <div className="dashboard-divider"></div>
-</div>
+      <div className="dashboard-headerss-wrapper">
+        <div className="dashboard-headerss">
+          <h2>📘 Available Modules</h2>
+          <div className="module-controls">
+            <input
+              type="text"
+              placeholder="🔍 Search modules..."
+              className="search-bar"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+            <select 
+              onChange={e => setSortOption(e.target.value)} 
+              className="sort-dropdown"
+              value={sortOption}
+            >
+              <option value="latest">Newest First</option>
+              <option value="alphabetical">A–Z</option>
+            </select>
+            <button onClick={() => setShowUploadModal(true)} className="floating-upload-button">
+              Upload Module
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-divider"></div>
+      </div>
+    
+        {!loading && filteredModules.length === 0 && (
+          <div className="dashboard-empty">You haven't uploaded any modules yet.</div>
+        )}
     
       <div className="module-list">
         {filteredModules.map((module) => (
@@ -388,50 +488,130 @@ function Dashboard() {
               </button>
             </div>
 
-              <div className="module-card-content">
-                <p><strong>Outline:</strong></p>
-                <p>{module.description}</p>
+            <div className="module-card-content">
+              {/* FILE PREVIEW FEATURE */}
+      <div className="module-preview">
+  {module.file_url ? (
+    <>
+      {module.file_url.toLowerCase().endsWith(".pdf") && (
+        <iframe
+          src={module.file_url}
+          width="300"
+          height="150"
+          style={{ border: "1px solid #ccc", borderRadius: "4px" }}
+          title="PDF preview"
+        />
+      )}
 
-                <div className="file-actions">
-                  {module.file_url ? (
-                    <>
-                      <button
-                        className="view-file-button"
-                        onClick={() => handleViewFile(module.file_url, module.file_name)}
-                      >
-                        <FaEye /> View File
-                      </button>
-                      <button
-                        className="download-file-button"
-                        onClick={() => handleDownloadFile(module.file_url, module.file_name || `${module.title}.pdf`)}
-                      >
-                        <FaDownload /> Download
-                      </button>
-                    </>
-                  ) : (
-                    <div className="no-file-message">
-                      <span style={{ color: '#666', fontSize: '14px' }}>📄 No file attached</span>
-                    </div>
-                  )}
-                </div>
+      {/* DOCX / PPTX via Office Viewer */}
+      {(module.file_url.endsWith(".docx") || module.file_url.endsWith(".pptx")) && (
+        <iframe
+          src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(module.file_url)}`}
+          width="300"
+          height="150"
+          style={{ border: "1px solid #ccc", borderRadius: "4px" }}
+          title="Office preview"
+        />
+      )}
+
+      {/* TXT preview */}
+      {module.file_url.endsWith(".txt") && (
+        <iframe
+          src={module.file_url}
+          width="300"
+          height="150"
+          style={{ border: "1px solid #ccc", borderRadius: "4px" }}
+          title="Text preview"
+        />
+      )}
+
+      {/* Fallback for unsupported types */}
+      {!(module.file_url.endsWith(".pdf") ||
+         module.file_url.endsWith(".docx") ||
+         module.file_url.endsWith(".pptx") ||
+         module.file_url.endsWith(".txt")) && (
+        <div
+          style={{
+            width: "300px",
+            height: "150px",
+            border: "1px dashed #aaa",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            color: "#666",
+            fontSize: "14px",
+          }}
+        >
+          No Preview
+        </div>
+      )}
+    </>
+  ) : (
+    <div
+      style={{
+        width: "200px",
+        height: "120px",
+        border: "1px dashed #aaa",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        color: "#666",
+        fontSize: "14px",
+      }}
+    >
+      📄 No File
+    </div>
+  )}
+</div>
+
+          {fileInfo[module.id] && (
+               <p style={{ fontSize: "14px", color: "#444" }}>
+              {fileInfo[module.id].type} · {fileInfo[module.id].size}
+              </p>
+         )}
+
+              <p><strong>Outline:</strong></p>
+              <p>{module.description}</p>
+
+              <div className="file-actions">
+                {module.file_url ? (
+                  <>
+                    <button
+                      className="view-file-button"
+                      onClick={() => handleViewFile(module.file_url, module.file_name)}
+                    >
+                      <FaEye /> View File
+                    </button>
+                    <button
+                      className="download-file-button"
+                      onClick={() => handleDownloadFile(module.file_url, module.file_name || `${module.title}.pdf`)}
+                    >
+                      <FaDownload /> Download
+                    </button>
+                  </>
+                ) : (
+                  <div className="no-file-message">
+                    <span style={{ color: '#666', fontSize: '14px' }}>📄 No file attached</span>
+                  </div>
+                )}
+              </div>
                 
-                <p>
-                  Uploaded by: <strong>{module.uploadedBy}</strong> <br />
-                  on {formatDate(module.uploadedAt)}
-                </p>
-              </div>
-
-              <div className="module-card-footer">
-                <button
-                  onClick={() => handleDeleteClick(module.id)}
-                  className="delete-module-button"
-                >
-                  🗑️ Delete Module
-                </button>
-              </div>
+              <p>
+                Uploaded by: <strong>{module.uploadedBy}</strong> <br />
+                on {formatDate(module.uploadedAt)}
+              </p>
             </div>
-        )
-        )}
+
+            <div className="module-card-footer">
+              <button
+                onClick={() => handleDeleteClick(module.id)}
+                className="delete-module-button"
+              >
+                🗑️ Delete Module
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     
       {showUploadModal && (
@@ -447,7 +627,7 @@ function Dashboard() {
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows="6" required
                 placeholder="Provide a detailed outline of the module topics, learning objectives, etc."></textarea>
               
-              <label>Attach a file (optional):</label>
+              <label>Attach a file:</label>
               <input 
                 type="file" 
                 accept=".pdf,.doc,.docx,.ppt,.pptx,.txt" 
@@ -488,22 +668,54 @@ function Dashboard() {
       )}
 
       {showDeleteModal && (
-        <div className="modal-overlay">
-          <div className="modal-box">
-            <p>Are you sure you want to delete?</p>
-            <div className="modal-buttons">
-              <button className="modal-logout-btn" onClick={handleConfirmDelete}>
-                Delete
-              </button>
-              <button className="modal-cancel-btn" onClick={() => setShowDeleteModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  <div className="modal-overlaysss">
+    <div className="modal-box">
+      <p>Are you sure you want to delete this module?</p>
+      <div className="modal-buttons">
+        <button 
+          className="modal-logout-btn" 
+          onClick={handleConfirmDelete}
+        >
+          Delete
+        </button>
+        <button 
+          className="modal-cancel-btn" 
+          onClick={() => setShowDeleteModal(false)}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
-  );
-}
+  </div>
+)}
+
+      {showCannotDeleteModal && (
+  <div className="modal-overlaysss">
+    <div className="modal-boxes">
+      <p>⚠️ This module cannot be deleted because it has been saved to bookmarks.</p>
+      <p>Please unsave it first from your Saved Modules page if you want to delete it.</p>
+      <div className="modal-buttons">
+        <button 
+          className="modal-cancel-btns" 
+          onClick={() => setShowCannotDeleteModal(false)}
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
+      {showViewer && (
+        <FileViewer
+          fileUrl={currentFileUrl}
+          fileName={currentFileName}
+          onClose={() => setShowViewer(false)}
+        />
+      )}
+      </div>
+)}
 
 export default Dashboard;

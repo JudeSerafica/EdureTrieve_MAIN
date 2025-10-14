@@ -14,7 +14,7 @@ export default function ForgotPassword() {
     setError('');
     setMessage('');
 
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: 'http://localhost:3000/update-password', // Adjust if needed
     });
 
