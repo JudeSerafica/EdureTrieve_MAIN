@@ -31,6 +31,8 @@ function Dashboard() {
 
   // Store file info state (size, type, pages)
   const [fileInfo, setFileInfo] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const modulesPerPage = 20;
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -402,9 +404,9 @@ function Dashboard() {
     try {
       if (!dateString) return 'Date not available';
       const date = new Date(dateString);
-      const options = { 
-        month: 'short', 
-        day: 'numeric', 
+      const options = {
+        month: 'short',
+        day: 'numeric',
         year: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
@@ -414,6 +416,18 @@ function Dashboard() {
     } catch (err) {
       return 'Invalid date';
     }
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
   
   if (loading) {
@@ -434,6 +448,11 @@ function Dashboard() {
       return new Date(b.uploadedAt) - new Date(a.uploadedAt);
     });
 
+  const totalPages = Math.ceil(filteredModules.length / modulesPerPage);
+  const indexOfLastModule = currentPage * modulesPerPage;
+  const indexOfFirstModule = indexOfLastModule - modulesPerPage;
+  const currentModules = filteredModules.slice(indexOfFirstModule, indexOfLastModule);
+
   return (
     <div className="dashboard-page">
       <div className="dashboard-headerss-wrapper">
@@ -445,10 +464,16 @@ function Dashboard() {
               placeholder="🔍 Search modules..."
               className="search-bar"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset to first page when searching
+              }}
             />
-            <select 
-              onChange={e => setSortOption(e.target.value)} 
+            <select
+              onChange={e => {
+                setSortOption(e.target.value);
+                setCurrentPage(1); // Reset to first page when sorting
+              }}
               className="sort-dropdown"
               value={sortOption}
             >
@@ -468,7 +493,7 @@ function Dashboard() {
         )}
     
       <div className="module-list">
-        {filteredModules.map((module) => (
+        {currentModules.map((module) => (
           <div key={module.id} className="module-card">
             <div className="module-card-header">
               <h3
@@ -613,6 +638,40 @@ function Dashboard() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="pagination" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '20px 0' }}>
+          <button
+            onClick={handlePrevPage}
+            disabled={currentPage === 1}
+            style={{ margin: '0 5px', padding: '5px 10px', border: '1px solid #ccc', background: 'white', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+          >
+
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              style={{
+                margin: '0 5px',
+                padding: '5px 10px',
+                border: '1px solid #ccc',
+                background: page === currentPage ? '#3458bb' : 'white',
+                color: page === currentPage ? 'white' : 'black',
+                cursor: 'pointer'
+              }}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+            style={{ margin: '0 5px', padding: '5px 10px', border: '1px solid #ccc', background: 'white', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+          >
+          </button>
+        </div>
+      )}
     
       {showUploadModal && (
         <div className="modals-overlay">
