@@ -85,6 +85,7 @@ function Chats() {
           setActiveChatMessages([]);
           setPrompt("");
           setError("");
+          
         }
       } catch (err) {
         if (!isMounted) return;
