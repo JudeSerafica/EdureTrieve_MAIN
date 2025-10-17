@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useAuthStatus from '../hooks/useAuthStatus';
 import ReactMarkdown from 'react-markdown';
-import { FaPaperPlane, FaStop, FaPlus, FaComments, FaTrash } from 'react-icons/fa';
+import { FaPaperPlane, FaStop, FaPlus, FaComments, FaTrash, FaImage } from 'react-icons/fa';
 import {
   formatFirebaseTimestamp,
   generateUniqueId,
   fetchChatHistoryApi,
   saveChatEntryApi,
   deleteChatSessionApi,
-  generateContentApi
+  generateContentApi,
+  processChatImageApi
 } from '../utils/ChatHelpers';
 
 function Chats() {
@@ -20,7 +21,10 @@ function Chats() {
   const [error, setError] = useState('');
   const [chatHistorySessions, setChatHistorySessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const chatMessagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const handleNewChat = useCallback(() => {
     if (activeChatMessages.length > 0 && activeSessionId) {
@@ -51,6 +55,8 @@ function Chats() {
     setActiveChatMessages([]);
     setPrompt('');
     setError('');
+    setSelectedImage(null);
+    setImagePreview(null);
   }, [activeChatMessages, activeSessionId]);
 
  useEffect(() => {
@@ -101,9 +107,27 @@ function Chats() {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChatMessages]);
 
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleGenerateContent = async (e) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim() && !selectedImage) return;
 
     setApiLoading(true);
     setError('');
@@ -115,7 +139,15 @@ function Chats() {
     }
 
     const currentPrompt = prompt;
+    const currentImage = selectedImage;
+    const currentImagePreview = imagePreview;
+
     setPrompt('');
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
 
     const now = Date.now();
     const newTimestamp = {
@@ -129,84 +161,147 @@ function Chats() {
       setActiveSessionId(currentConversationId);
     }
 
-    const newUserMessage = {
-      type: 'user',
-      text: currentPrompt,
-      timestamp: newTimestamp,
-      conversationId: currentConversationId,
-    };
-    setActiveChatMessages(prev => [...prev, newUserMessage]);
+    // Handle image upload if present
+    if (currentImage) {
+      try {
+        console.log('Chats.js: Processing image upload');
+        const imageData = await processChatImageApi(user, currentImage, currentConversationId, currentPrompt || null);
 
-    try {
-      console.log('Chats.js: Calling generateContentApi with:', {
-        userId: user?.id,
-        prompt: currentPrompt?.substring(0, 50) + '...',
-        conversationId: currentConversationId
-      });
-      const generateData = await generateContentApi(user, currentPrompt, currentConversationId);
-      const newResponse = generateData.generatedContent;
+        const newUserMessage = {
+          type: 'user',
+          text: currentPrompt
+            ? `${currentPrompt}\n\n[Image uploaded] ${imageData.extractedText}`
+            : `[Image uploaded] ${imageData.extractedText}`,
+          timestamp: newTimestamp,
+          conversationId: currentConversationId,
+          imagePreview: currentImagePreview
+        };
+        setActiveChatMessages(prev => [...prev, newUserMessage]);
 
-      const newAiMessage = {
-        type: 'ai',
-        text: newResponse,
-        timestamp: {
-          _seconds: Math.floor(Date.now() / 1000),
-          _nanoseconds: (Date.now() % 1000) * 1_000_000
-        },
-        conversationId: currentConversationId,
-      };
-      setActiveChatMessages(prev => [...prev, newAiMessage]);
+        const newAiMessage = {
+          type: 'ai',
+          text: imageData.aiResponse,
+          timestamp: {
+            _seconds: Math.floor(Date.now() / 1000),
+            _nanoseconds: (Date.now() % 1000) * 1_000_000
+          },
+          conversationId: currentConversationId,
+        };
+        setActiveChatMessages(prev => [...prev, newAiMessage]);
 
-      setChatHistorySessions(prevSessions => {
-        const sessionToUpdateIndex = prevSessions.findIndex(session => session.id === currentConversationId);
-        if (sessionToUpdateIndex !== -1) {
-          const updatedSessions = [...prevSessions];
-          const session = updatedSessions[sessionToUpdateIndex];
-          session.messages = [...session.messages, newUserMessage, newAiMessage];
-          if (session.title === 'New Chat' || session.title.startsWith('Chat from')) {
-            const firstPrompt = session.messages.find(msg => msg.type === 'user')?.text || 'Untitled Chat';
-            session.title = firstPrompt.length > 30 ? firstPrompt.slice(0, 30) + '...' : firstPrompt;
+        setChatHistorySessions(prevSessions => {
+          const sessionToUpdateIndex = prevSessions.findIndex(session => session.id === currentConversationId);
+          if (sessionToUpdateIndex !== -1) {
+            const updatedSessions = [...prevSessions];
+            const session = updatedSessions[sessionToUpdateIndex];
+            session.messages = [...session.messages, newUserMessage, newAiMessage];
+            if (session.title === 'New Chat' || session.title.startsWith('Chat from')) {
+              session.title = 'Image Analysis Chat';
+            }
+            return updatedSessions;
+          } else {
+            return [{
+              id: currentConversationId,
+              title: 'Image Analysis Chat',
+              messages: [newUserMessage, newAiMessage]
+            }, ...prevSessions];
           }
-          return updatedSessions;
-        } else {
-          const firstPrompt = newUserMessage.text || 'Untitled Chat';
-          const newSessionTitle = firstPrompt.length > 30 ? firstPrompt.slice(0, 30) + '...' : firstPrompt;
-          return [{
-            id: currentConversationId,
-            title: newSessionTitle,
-            messages: [newUserMessage, newAiMessage]
-          }, ...prevSessions];
-        }
-      });
+        });
 
-      await saveChatEntryApi(user, {
-        prompt: currentPrompt,
-        response: newResponse,
+        await saveChatEntryApi(user, {
+          prompt: newUserMessage.text,
+          response: newAiMessage.text,
+          timestamp: newTimestamp,
+          conversationId: currentConversationId,
+        });
+
+      } catch (err) {
+        console.error('Image processing error:', err);
+        setError(err.message || 'Failed to process image.');
+        setApiLoading(false);
+        return;
+      }
+    } else {
+      // Handle text-only message
+      const newUserMessage = {
+        type: 'user',
+        text: currentPrompt,
         timestamp: newTimestamp,
         conversationId: currentConversationId,
-      });
+      };
+      setActiveChatMessages(prev => [...prev, newUserMessage]);
 
-    } catch (err) {
-      console.error('Frontend error:', err);
-      setError(err.message || 'Failed to get response or save chat.');
-      setActiveChatMessages(prev => {
-        const userMsgIndex = prev.findIndex(msg => msg === newUserMessage);
-        return userMsgIndex !== -1 ? prev.slice(0, userMsgIndex) : prev;
-      });
-      setChatHistorySessions(prevSessions => {
-        if (!activeSessionId) {
-            return prevSessions.filter(session => session.id !== currentConversationId);
-        }
-        return prevSessions.map(session => {
-            if (session.id === activeSessionId && session.messages.length > 1) {
-                return { ...session, messages: session.messages.slice(0, -2) };
-            }
-            return session;
+      try {
+        console.log('Chats.js: Calling generateContentApi with:', {
+          userId: user?.id,
+          prompt: currentPrompt?.substring(0, 50) + '...',
+          conversationId: currentConversationId
         });
-      });
-    } finally {
-      setApiLoading(false);
+        const generateData = await generateContentApi(user, currentPrompt, currentConversationId);
+        const newResponse = generateData.generatedContent;
+
+        const newAiMessage = {
+          type: 'ai',
+          text: newResponse,
+          timestamp: {
+            _seconds: Math.floor(Date.now() / 1000),
+            _nanoseconds: (Date.now() % 1000) * 1_000_000
+          },
+          conversationId: currentConversationId,
+        };
+        setActiveChatMessages(prev => [...prev, newAiMessage]);
+
+        setChatHistorySessions(prevSessions => {
+          const sessionToUpdateIndex = prevSessions.findIndex(session => session.id === currentConversationId);
+          if (sessionToUpdateIndex !== -1) {
+            const updatedSessions = [...prevSessions];
+            const session = updatedSessions[sessionToUpdateIndex];
+            session.messages = [...session.messages, newUserMessage, newAiMessage];
+            if (session.title === 'New Chat' || session.title.startsWith('Chat from')) {
+              const firstPrompt = session.messages.find(msg => msg.type === 'user')?.text || 'Untitled Chat';
+              session.title = firstPrompt.length > 30 ? firstPrompt.slice(0, 30) + '...' : firstPrompt;
+            }
+            return updatedSessions;
+          } else {
+            const firstPrompt = newUserMessage.text || 'Untitled Chat';
+            const newSessionTitle = firstPrompt.length > 30 ? firstPrompt.slice(0, 30) + '...' : firstPrompt;
+            return [{
+              id: currentConversationId,
+              title: newSessionTitle,
+              messages: [newUserMessage, newAiMessage]
+            }, ...prevSessions];
+          }
+        });
+
+        await saveChatEntryApi(user, {
+          prompt: currentPrompt,
+          response: newResponse,
+          timestamp: newTimestamp,
+          conversationId: currentConversationId,
+        });
+
+      } catch (err) {
+        console.error('Frontend error:', err);
+        setError(err.message || 'Failed to get response or save chat.');
+        setActiveChatMessages(prev => {
+          const userMsgIndex = prev.findIndex(msg => msg === newUserMessage);
+          return userMsgIndex !== -1 ? prev.slice(0, userMsgIndex) : prev;
+        });
+        setChatHistorySessions(prevSessions => {
+          if (!activeSessionId) {
+              return prevSessions.filter(session => session.id !== currentConversationId);
+          }
+          return prevSessions.map(session => {
+              if (session.id === activeSessionId && session.messages.length > 1) {
+                  return { ...session, messages: session.messages.slice(0, -2) };
+              }
+              return session;
+          });
+        });
+      }
     }
+
+    setApiLoading(false);
   };
 
   const loadChatSession = (session) => {
@@ -214,6 +309,8 @@ function Chats() {
     setActiveSessionId(session.id);
     setPrompt('');
     setError('');
+    setSelectedImage(null);
+    setImagePreview(null);
   };
 
   const handleDeleteChatSession = async (sessionIdToDelete) => {
@@ -323,6 +420,11 @@ function Chats() {
           {activeChatMessages.map((msg, index) => (
             <div key={index} className={`chat-message-card ${msg.type}-message`}>
               <div className="message-content">
+                {msg.imagePreview && (
+                  <div className="message-image-container">
+                    <img src={msg.imagePreview} alt="Uploaded" className="message-image" />
+                  </div>
+                )}
                 <ReactMarkdown>{msg.text}</ReactMarkdown>
                 {msg.timestamp && (
                   <small className="message-timestamp">
@@ -343,22 +445,48 @@ function Chats() {
         </div>
 
         <div className="chat-input-area">
+          {imagePreview && (
+            <div className="image-preview-container">
+              <img src={imagePreview} alt="Selected" className="image-preview" />
+              <button
+                type="button"
+                className="remove-image-button"
+                onClick={handleRemoveImage}
+                title="Remove image"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <form onSubmit={handleGenerateContent} className="chat-input-form">
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows="1"
-              placeholder={user ? "Type your message..." : "Please log in to chat."}
-              disabled={apiLoading || !user || !activeSessionId}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGenerateContent(e);
-                }
-              }}
-            ></textarea>
-            <button className="send-button" disabled={apiLoading || !user || !activeSessionId}>
+            <div className="input-with-image">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="image-upload"
+              />
+              <label htmlFor="image-upload" className="image-upload-button">
+                <FaImage size="1.2em" />
+              </label>
+              <textarea
+                id="prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows="1"
+                placeholder={user ? "Type your message or upload an image..." : "Please log in to chat."}
+                disabled={apiLoading || !user || !activeSessionId}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleGenerateContent(e);
+                  }
+                }}
+              ></textarea>
+            </div>
+            <button className="send-button" disabled={apiLoading || !user || !activeSessionId || (!prompt.trim() && !selectedImage)}>
               {apiLoading ? <FaStop className="stop-icon" size="1.3em" /> : <FaPaperPlane className='send-icon' size="1.3em" />}
             </button>
           </form>

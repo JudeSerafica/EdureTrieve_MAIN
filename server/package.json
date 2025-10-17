@@ -21,9 +21,12 @@
     "firebase-admin": "^13.4.0",
     "google-auth-library": "^10.2.0",
     "groq-sdk": "^0.33.0",
+    "mammoth": "^1.11.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.5",
-    "react-markdown": "^10.1.0"
+    "pdf-parse": "^2.4.3",
+    "react-markdown": "^10.1.0",
+    "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

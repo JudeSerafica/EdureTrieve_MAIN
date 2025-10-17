@@ -10,6 +10,9 @@ import Groq from 'groq-sdk';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 
+// Import chat routes
+import chatRoutes from './routes/chatRoutes.js';
+
 const app = express();
 const upload = multer();
 const PORT = process.env.PORT || 5000;
@@ -27,6 +30,9 @@ const googleClient = new OAuth2Client(
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Mount chat routes
+app.use('/api/chat', chatRoutes);
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcepfndjsmktrfcelvgs.supabase.co',

@@ -11,7 +11,6 @@ import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 
 const app = express();
-const upload = multer();
 const PORT = process.env.PORT || 5000;
 
 // Initialize Gemini AI (FIXED: force v1 + explicit baseUrl)
@@ -514,7 +513,11 @@ app.post('/api/auth/check-verification-status', (req, res) => {
 // 📤 EXISTING ROUTES
 // =========================
 
-// AI Generation Endpoint
+// Import chat routes
+const chatRoutes = require('./src/routes/chatRoutes');
+app.use('/api/chat', chatRoutes);
+
+// AI Generation Endpoint with RAG
 app.post('/api/generate-content', async (req, res) => {
   const { prompt, userId, conversationId } = req.body;
 
@@ -525,8 +528,8 @@ app.post('/api/generate-content', async (req, res) => {
   try {
     console.log('🚀 API Request received:', { prompt: prompt.substring(0, 50) + '...', userId, conversationId });
 
-    // 🧠 Generate content using Gemini (or other LLM)
-    const content = await generateContent(prompt);
+    // 🧠 Generate content using Groq with RAG (userId enables module retrieval)
+    const content = await generateContent(prompt, userId);
 
     console.log('📤 Sending response back to client:', { contentLength: content ? content.length : 0 });
 
@@ -546,13 +549,54 @@ app.get('/api/protected-data', authenticateToken, (req, res) => {
   });
 });
 
-// Upload Module Route
+// Upload Module Route with file support (using ES module import from top)
+const upload = multer({
+  dest: 'uploads/',
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/gif'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, DOCX, TXT, JPEG, PNG, and GIF files are allowed'), false);
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
 app.post('/upload-module', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     const { title, description } = req.body;
-    
+    const file = req.file;
+
     if (!title || !description) {
       return res.status(400).json({ error: 'Title and description are required' });
+    }
+
+    let extractedContent = description; // Default to description if no file
+
+    // If a file is uploaded, extract text content
+    if (file) {
+      try {
+        const { extractTextFromFile } = require('./src/utils/textExtractor');
+        const fs = require('fs');
+        const path = require('path');
+
+        const filePath = path.join(__dirname, 'uploads', file.filename);
+        extractedContent = await extractTextFromFile(filePath, file.mimetype);
+
+        // Clean up the uploaded file after extraction
+        fs.unlinkSync(filePath);
+      } catch (extractionError) {
+        console.warn('File extraction failed, using description only:', extractionError.message);
+        // Continue with description if extraction fails
+      }
     }
 
     // Insert into modules table
@@ -560,16 +604,15 @@ app.post('/upload-module', authenticateToken, upload.single('file'), async (req,
       .from('modules')
       .insert([{
         title,
-        description,
-        uploadedBy: req.user.email,
-        user_id: req.user.id,
+        description: extractedContent,
+        uploadedBy: req.user.id,
         uploadedAt: new Date().toISOString()
       }])
       .select();
 
     if (error) throw error;
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Module uploaded successfully',
       data
     });
@@ -736,9 +779,10 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: [
       'POST /api/auth/google/signup - Initiate Google OAuth signup',
-      'POST /api/auth/google/callback - Handle Google OAuth callback', 
+      'POST /api/auth/google/callback - Handle Google OAuth callback',
       'POST /api/auth/verify-signup-code - Complete signup with verification code',
       'POST /api/auth/check-verification-status - Check verification status',
+      'POST /api/chat/process-image - Process chat images with OCR',
       'POST /api/generate-content - Generate AI content',
       'GET /api/protected-data - Test protected route',
       'POST /upload-module - Upload module',
@@ -765,6 +809,7 @@ app.listen(PORT, () => {
   console.log('   POST /api/auth/google/callback');
   console.log('   POST /api/auth/verify-signup-code');
   console.log('   POST /api/auth/check-verification-status');
+  console.log('   POST /api/chat/process-image');
   console.log('   POST /api/generate-content');
   console.log('   GET  /api/protected-data');
   console.log('   POST /upload-module');

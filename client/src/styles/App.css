@@ -2487,6 +2487,17 @@ p#message, .auth-form-card .auth-message.success {
     flex-grow: 1;
 }
 
+.message-image-container {
+    margin-bottom: 10px;
+}
+
+.message-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
 .chat-message-card p {
     margin: 0;
     line-height: 1.4;
@@ -2542,6 +2553,67 @@ p#message, .auth-form-card .auth-message.success {
     box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
     box-sizing: border-box;
     z-index: 10;
+}
+
+.image-preview-container {
+    margin-bottom: 10px;
+    position: relative;
+    display: inline-block;
+}
+
+.image-preview {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.remove-image-button {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.remove-image-button:hover {
+    background-color: #c82333;
+}
+
+.input-with-image {
+    display: flex;
+    align-items: flex-end;
+    width: 100%;
+    gap: 10px;
+}
+
+.image-upload-button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+    flex-shrink: 0;
+}
+
+.image-upload-button:hover {
+    background-color: #5a6268;
 }
 
 .chat-input-form {

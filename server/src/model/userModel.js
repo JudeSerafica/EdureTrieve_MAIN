@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabaseClient');
+import { supabase } from '../config/supabaseClient.js';
 
 // ✅ Utility to format timestamp into YYYY-MM-DD
 function formatDate(date, format = 'daily') {
@@ -98,7 +98,86 @@ async function saveChatEntry(userId, prompt, response, conversationId, clientTim
     clientTimestamp._seconds * 1000 + Math.floor(clientTimestamp._nanoseconds / 1_000_000)
   );
 
-  const { error } = await supabase
+  console.log('[saveChatEntry] 📝 Attempting to save:', {
+    user_id: userId,
+    prompt: prompt.substring(0, 50) + '...',
+    response: response.substring(0, 50) + '...',
+    conversationId,
+    timestamp
+  });
+
+  // Check if chat_history table exists and what its structure is
+  const { data: tableInfo, error: tableError } = await supabase
+    .from('chat_history')
+    .select('*')
+    .limit(1);
+
+  if (tableError) {
+    console.error('[saveChatEntry] ❌ Table check failed:', tableError);
+    // If table doesn't exist, let's see what the error is
+    if (tableError.code === 'PGRST116') {
+      console.error('[saveChatEntry] ❌ chat_history table does not exist');
+      throw new Error('chat_history table does not exist');
+    }
+  } else {
+    console.log('[saveChatEntry] ✅ Table exists, sample data:', tableInfo);
+
+    // Check what columns actually exist in the table
+    if (tableInfo && tableInfo.length > 0) {
+      const existingColumns = Object.keys(tableInfo[0]);
+      console.log('[saveChatEntry] 📋 Existing columns:', existingColumns);
+
+      // Check if conversationId exists, if not, find alternative
+      let conversationColumn = 'conversationId';
+      if (!existingColumns.includes('conversationId')) {
+        console.error('[saveChatEntry] ❌ conversationId column does not exist in table');
+
+        // Try different possible column names
+        const possibleColumns = ['conversation_id', 'conv_id', 'session_id', 'chat_session_id', 'conversationid'];
+        const foundColumn = possibleColumns.find(col => existingColumns.includes(col));
+
+        if (foundColumn) {
+          conversationColumn = foundColumn;
+          console.log(`[saveChatEntry] 🔄 Using ${foundColumn} instead of conversationId`);
+        } else {
+          console.error('[saveChatEntry] ❌ Available columns:', existingColumns);
+          throw new Error(`conversationId column not found. Available columns: ${existingColumns.join(', ')}`);
+        }
+      }
+
+      // Build the insert object dynamically based on existing columns
+      const insertData = {
+        user_id: userId,
+        prompt,
+        response,
+        timestamp,
+      };
+
+      // Add conversation ID with the correct column name
+      insertData[conversationColumn] = conversationId;
+
+      console.log('[saveChatEntry] 📝 Inserting with data:', insertData);
+
+      const { data, error } = await supabase
+        .from('chat_history')
+        .insert(insertData)
+        .select();
+
+      console.log('[saveChatEntry] 📊 Insert result:', { data, error });
+
+      if (error) {
+        console.error('[saveChatEntry] ❌', error.message);
+        console.error('[saveChatEntry] ❌ Full error object:', JSON.stringify(error, null, 2));
+        throw new Error('Failed to save chat entry.');
+      }
+
+      return; // Success, exit early
+    }
+  }
+
+  // Fallback to original approach if we couldn't determine columns
+  console.log('[saveChatEntry] 🔄 Falling back to original insert approach');
+  const { data, error } = await supabase
     .from('chat_history')
     .insert({
       user_id: userId,
@@ -106,10 +185,14 @@ async function saveChatEntry(userId, prompt, response, conversationId, clientTim
       response,
       conversationId,
       timestamp,
-    });
+    })
+    .select();
+
+  console.log('[saveChatEntry] 📊 Insert result:', { data, error });
 
   if (error) {
     console.error('[saveChatEntry] ❌', error.message);
+    console.error('[saveChatEntry] ❌ Full error object:', JSON.stringify(error, null, 2));
     throw new Error('Failed to save chat entry.');
   }
 }
@@ -129,13 +212,30 @@ async function getChatHistory(userId) {
     throw new Error('Failed to retrieve chat history.');
   }
 
-  return data.map(entry => ({
-    ...entry,
-    timestamp: {
-      _seconds: Math.floor(new Date(entry.timestamp).getTime() / 1000),
-      _nanoseconds: (new Date(entry.timestamp).getTime() % 1000) * 1_000_000,
-    },
-  }));
+  // Map the data to ensure consistent field names for the client
+  return data.map(entry => {
+    // Find the correct conversation ID column name and map it to conversationId
+    let conversationId = entry.conversationId;
+    if (!conversationId) {
+      // Try different possible column names
+      const possibleColumns = ['conversation_id', 'conv_id', 'session_id', 'chat_session_id', 'conversationid'];
+      for (const col of possibleColumns) {
+        if (entry[col]) {
+          conversationId = entry[col];
+          break;
+        }
+      }
+    }
+
+    return {
+      ...entry,
+      conversationId, // Ensure this field exists for the client
+      timestamp: {
+        _seconds: Math.floor(new Date(entry.timestamp).getTime() / 1000),
+        _nanoseconds: (new Date(entry.timestamp).getTime() % 1000) * 1_000_000,
+      },
+    };
+  });
 }
 
 // ✅ Delete chat entries by conversation ID
@@ -144,11 +244,34 @@ async function deleteChatEntriesByConversationId(userId, conversationId) {
     throw new Error('User ID and conversation ID are required.');
   }
 
-  const { error } = await supabase
+  // First, let's check what columns exist in the table to find the correct conversation ID column
+  const { data: tableInfo, error: tableError } = await supabase
     .from('chat_history')
-    .delete()
-    .eq('user_id', userId)
-    .eq('conversationId', conversationId);
+    .select('*')
+    .limit(1);
+
+  let conversationColumn = 'conversationId'; // default
+
+  if (!tableError && tableInfo && tableInfo.length > 0) {
+    const existingColumns = Object.keys(tableInfo[0]);
+
+    // Find the correct column name for conversation ID
+    if (!existingColumns.includes('conversationId')) {
+      const possibleColumns = ['conversation_id', 'conv_id', 'session_id', 'chat_session_id', 'conversationid'];
+      const foundColumn = possibleColumns.find(col => existingColumns.includes(col));
+      if (foundColumn) {
+        conversationColumn = foundColumn;
+      }
+    }
+  }
+
+  // Build the query dynamically
+  let query = supabase.from('chat_history').delete().eq('user_id', userId);
+
+  // Add the conversation ID filter with the correct column name
+  query = query.eq(conversationColumn, conversationId);
+
+  const { error } = await query;
 
   if (error) {
     console.error('[deleteChatEntriesByConversationId] ❌', error.message);
@@ -174,7 +297,7 @@ async function checkEmail(email) {
   return !!data;
 }
 
-module.exports = {
+export {
   getUserById,
   updateUserProfile,
   getUserAnalytics,

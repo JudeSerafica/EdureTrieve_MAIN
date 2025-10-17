@@ -170,3 +170,75 @@ export const generateContentApi = async (user, prompt, conversationId) => {
 
   return result;
 };
+
+/**
+ * Processes an uploaded image through OCR and AI analysis, then saves to localStorage
+ */
+export const processChatImageApi = async (user, imageFile, conversationId, customPrompt = null) => {
+  console.log('ChatHelpers.js: processChatImageApi called with:', {
+    userId: user?.id,
+    imageFileName: imageFile?.name,
+    imageFileSize: imageFile?.size,
+    conversationId
+  });
+
+  if (!imageFile) {
+    throw new Error('No image file provided');
+  }
+
+  if (!conversationId) {
+    throw new Error('conversationId is required');
+  }
+
+  const formData = new FormData();
+  formData.append('image', imageFile);
+  formData.append('conversationId', conversationId);
+  if (customPrompt) {
+    formData.append('prompt', customPrompt);
+  }
+
+  const res = await fetch('http://localhost:5000/api/chat/process-image', {
+    method: 'POST',
+    body: formData,
+  });
+
+  const result = await res.json();
+  if (!res.ok) {
+    throw new Error(result.error || 'Failed to process image');
+  }
+
+  // Create image preview URL for display
+  const imagePreview = URL.createObjectURL(imageFile);
+
+  // Create message objects
+  const imageMessage = {
+    type: 'user',
+    text: `[Image uploaded] ${result.extractedText}`,
+    timestamp: {
+      _seconds: Math.floor(Date.now() / 1000),
+      _nanoseconds: (Date.now() % 1000) * 1_000_000
+    },
+    conversationId,
+    imagePreview
+  };
+
+  const aiMessage = {
+    type: 'ai',
+    text: result.aiResponse,
+    timestamp: {
+      _seconds: Math.floor(Date.now() / 1000),
+      _nanoseconds: (Date.now() % 1000) * 1_000_000
+    },
+    conversationId
+  };
+
+  // Save to localStorage like regular chat messages
+  await saveChatEntryApi(user, {
+    prompt: imageMessage.text,
+    response: aiMessage.text,
+    timestamp: imageMessage.timestamp,
+    conversationId,
+  });
+
+  return result;
+};

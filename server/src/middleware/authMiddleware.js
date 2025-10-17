@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   'https://dcepfndjsmktrfcelvgs.supabase.co',
@@ -33,4 +33,4 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-module.exports = authenticateToken;
+export default authenticateToken;

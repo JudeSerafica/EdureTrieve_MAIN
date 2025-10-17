@@ -39,6 +39,26 @@ async function getAllModules() {
 }
 
 /**
+ * Fetches modules uploaded by a specific user.
+ * @param {string} userId The ID of the user.
+ * @returns {Promise<Array<Object>>} Array of module records for the user.
+ */
+async function getModulesByUserId(userId) {
+  const { data, error } = await supabase
+    .from('modules')
+    .select('*')
+    .eq('uploadedBy', userId)
+    .order('uploadedAt', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching modules by user ID:', error);
+    throw new Error('Could not fetch user modules.');
+  }
+
+  return data;
+}
+
+/**
  * Fetches a single module by ID.
  * @param {string} moduleId
  * @returns {Promise<Object|null>}
@@ -95,6 +115,7 @@ module.exports = {
   createModule,
   getAllModules,
   getModuleById,
+  getModulesByUserId,
   updateModule,
   deleteModule,
 };
