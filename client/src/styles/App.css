@@ -811,7 +811,7 @@ p#message, .auth-form-card .auth-message.success {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: width 0.5s ease;
+  transition: width 0.6s ease;
   flex-shrink: 0;
   height: 92.2vh;
 }
@@ -836,27 +836,49 @@ p#message, .auth-form-card .auth-message.success {
 .sidebar-toggle {
   position: absolute;
   top: 10px;         
-  left: 260px;       
+  left: 200px;       
   z-index: 1000;
-  transition: left 0.5s ease;
+  transition: left 0.6s ease;
 }
 
 .dashboard-sidebar.collapsed + .sidebar-toggle {
-  left: 0;                       
-  transform: translateX(25%);     
+  left: 10px;
+}
+
+.dashboard-sidebar.collapsed + .sidebar-toggle button {
+  background-color: #ffffff;
+  border: 1.5px solid #3458bb;
+  color: #2c3e50;
+
+  background-image: linear-gradient(#3458bb 0%, #3458bb 100%);
+  background-repeat: no-repeat;
+  background-size: 0% 100%; /* start hidden */
+  transition: background-size color 0.4s ease;
+}
+
+.dashboard-sidebar.collapsed + .sidebar-toggle button:hover {
+  background-size: 100% 100%;
+  color: white;
+}
+
+.dashboard-sidebar.collapsed + .sidebar-toggle button span {
+  background: white;
 }
 
 .sidebar-toggle button {
-  background: white;
+  background: transparent;
   border: none;
   cursor: pointer;
+  color: white;
   padding: 10px;
-  border-radius: 10px;
+  font-size: large;
+  border-radius: 40px;
   display: flex;
+  align-items: center;
+  justify-content: center;
   flex-direction: column;
-  justify-content: space-between;
   width: 40px;
-  height: 34px;
+  height: 40px;
 }
 
 /* Hamburger lines */
@@ -865,7 +887,7 @@ p#message, .auth-form-card .auth-message.success {
   height: 3px;
   width: 100%;
   border: none;
-  background: white;
+  background: #3458bb;
   border-radius: 2px;
   transition: all 0.3s ease;
 }
@@ -2294,7 +2316,7 @@ p#message, .auth-form-card .auth-message.success {
 /* This will be the main content area for the Chats component within the dashboard */
 .chat-page-content {
     display: flex; /* Creates the left (history) and right (active chat) columns */
-    height: calc(100vh - 65px); /* Adjust height to fit below your header (assuming 80px header height) */
+    height: calc(100vh - 20px); /* Adjust height to fit below your header (assuming 80px header height) */
     width: 100%;
     background-color: #f9fbfd;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -2304,10 +2326,10 @@ p#message, .auth-form-card .auth-message.success {
 
 /* Left Section: Chat History Sidebar */
 .chat-history-sidebar-section {
-    width: 17%; /* Fixed width for the history list */
+    width: 15%; /* Fixed width for the history list */
     background-color: #f9fbfd; /* Lighter background for history */
     border-right: 1px solid #e0e0e0;
-    padding: 20px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
     overflow-y: auto; /* Enable scrolling for history items */
@@ -2325,7 +2347,7 @@ p#message, .auth-form-card .auth-message.success {
 .history-panel-header h2 {
     margin: 3;
     color: #333;
-    font-size: 25px;
+    font-size: 22px;
 }
 
 .new-chat-button {
@@ -2334,7 +2356,7 @@ p#message, .auth-form-card .auth-message.success {
     border: none;
     border-radius: 5px;
     padding: 8px 12px;
-    font-size: 14px;
+    font-size: 12.5px;
     cursor: pointer;
     transition: background-color 0.3s ease;
     display: flex;
@@ -2492,8 +2514,8 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .message-image {
-    max-width: 200px;
-    max-height: 200px;
+    max-width: 250px;
+    max-height: 250px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
@@ -2548,6 +2570,7 @@ p#message, .auth-form-card .auth-message.success {
     right: 0;
     width: 100%;
     padding: 15px 20px;
+    border-radius: 10px;
     background-color: #fafafa; /* Match main content background */
     border-top: 1px solid #ddd;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
@@ -2572,14 +2595,14 @@ p#message, .auth-form-card .auth-message.success {
     position: absolute;
     top: -5px;
     right: -5px;
-    background-color: #dc3545;
+    background-color: #e04958;
     color: white;
     border: none;
     border-radius: 50%;
-    width: 25px;
-    height: 25px;
+    width: 0;
+    height: 0;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2598,7 +2621,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .image-upload-button {
-    background-color: #6c757d;
+    background-color: #3458bb;
     color: white;
     border: none;
     border-radius: 50%;
@@ -2613,7 +2636,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .image-upload-button:hover {
-    background-color: #5a6268;
+    background-color: #1e3a8a;
 }
 
 .chat-input-form {
@@ -2664,7 +2687,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .send-button:disabled {
-    background-color: #ccc;
+    background-color: #c8e3fd;
     cursor: not-allowed;
     transform: none;
 }
@@ -2679,6 +2702,51 @@ p#message, .auth-form-card .auth-message.success {
 
 .info-message {
     color: #3458bb;
+}
+
+/* Image Modal Styles */
+.image-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.image-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.enlarged-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.close-image-modal {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* CHATS END */

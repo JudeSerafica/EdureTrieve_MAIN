@@ -461,7 +461,7 @@ function Dashboard() {
           <div className="module-controls">
             <input
               type="text"
-              placeholder="🔍 Search modules..."
+              placeholder="Search modules..."
               className="search-bar"
               value={searchTerm}
               onChange={e => {

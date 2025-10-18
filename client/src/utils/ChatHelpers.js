@@ -55,7 +55,7 @@ export const generateUniqueId = () =>
 // 💾 LocalStorage Constants
 // ------------------------
 
-const getUserChatKey = (userId) => `eduretrieve_chat_sessions_${userId}`;
+export const getUserChatKey = (userId) => `eduretrieve_chat_sessions_${userId}`;
 
 // ------------------------
 // 📂 Load Chat Sessions
@@ -84,11 +84,11 @@ export const fetchChatHistoryApi = async (user) => {
 /**
  * Saves a new prompt-response pair to localStorage under the given session.
  */
-export const saveChatEntryApi = async (user, { prompt, response, conversationId, timestamp }) => {
+export const saveChatEntryApi = async (user, { prompt, response, conversationId, timestamp, imagePreview }) => {
   let sessions = await fetchChatHistoryApi(user);
 
   const newMessages = [
-    { type: 'user', text: prompt, timestamp },
+    { type: 'user', text: prompt, timestamp, imagePreview },
     { type: 'ai', text: response, timestamp },
   ];
 

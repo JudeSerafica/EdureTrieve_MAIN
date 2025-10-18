@@ -9,7 +9,8 @@ import {
   saveChatEntryApi,
   deleteChatSessionApi,
   generateContentApi,
-  processChatImageApi
+  processChatImageApi,
+  getUserChatKey
 } from '../utils/ChatHelpers';
 
 function Chats() {
@@ -23,6 +24,7 @@ function Chats() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [enlargedImage, setEnlargedImage] = useState(null);
   const chatMessagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -108,6 +110,13 @@ function Chats() {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChatMessages]);
 
+  // Sync chatHistorySessions to localStorage
+  useEffect(() => {
+    if (user && chatHistorySessions.length > 0) {
+      localStorage.setItem(getUserChatKey(user.id), JSON.stringify(chatHistorySessions));
+    }
+  }, [chatHistorySessions, user]);
+
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -124,6 +133,14 @@ function Chats() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleImageDoubleClick = (imageSrc) => {
+    setEnlargedImage(imageSrc);
+  };
+
+  const handleCloseEnlargedImage = () => {
+    setEnlargedImage(null);
   };
 
   const handleGenerateContent = async (e) => {
@@ -195,7 +212,11 @@ function Chats() {
           if (sessionToUpdateIndex !== -1) {
             const updatedSessions = [...prevSessions];
             const session = updatedSessions[sessionToUpdateIndex];
-            session.messages = [...session.messages, newUserMessage, newAiMessage];
+            // Check if messages are already added to prevent duplication
+            const lastMessage = session.messages[session.messages.length - 1];
+            if (!lastMessage || lastMessage.text !== newAiMessage.text) {
+              session.messages = [...session.messages, newUserMessage, newAiMessage];
+            }
             if (session.title === 'New Chat' || session.title.startsWith('Chat from')) {
               session.title = 'Image Analysis Chat';
             }
@@ -214,6 +235,7 @@ function Chats() {
           response: newAiMessage.text,
           timestamp: newTimestamp,
           conversationId: currentConversationId,
+          imagePreview: currentImagePreview,
         });
 
       } catch (err) {
@@ -257,7 +279,11 @@ function Chats() {
           if (sessionToUpdateIndex !== -1) {
             const updatedSessions = [...prevSessions];
             const session = updatedSessions[sessionToUpdateIndex];
-            session.messages = [...session.messages, newUserMessage, newAiMessage];
+            // Check if messages are already added to prevent duplication
+            const lastMessage = session.messages[session.messages.length - 1];
+            if (!lastMessage || lastMessage.text !== newAiMessage.text) {
+              session.messages = [...session.messages, newUserMessage, newAiMessage];
+            }
             if (session.title === 'New Chat' || session.title.startsWith('Chat from')) {
               const firstPrompt = session.messages.find(msg => msg.type === 'user')?.text || 'Untitled Chat';
               session.title = firstPrompt.length > 30 ? firstPrompt.slice(0, 30) + '...' : firstPrompt;
@@ -423,7 +449,13 @@ function Chats() {
               <div className="message-content">
                 {msg.imagePreview && (
                   <div className="message-image-container">
-                    <img src={msg.imagePreview} alt="Uploaded" className="message-image" />
+                    <img
+                      src={msg.imagePreview}
+                      alt="Uploaded"
+                      className="message-image"
+                      onClick={() => handleImageDoubleClick(msg.imagePreview)}
+                      style={{ cursor: 'pointer' }}
+                    />
                   </div>
                 )}
                 <ReactMarkdown>{msg.text}</ReactMarkdown>
@@ -470,7 +502,7 @@ function Chats() {
                 id="image-upload"
               />
               <label htmlFor="image-upload" className="image-upload-button">
-                <FaImage size="1.2em" />
+                <FaImage size="1.2em"/>
               </label>
               <textarea
                 id="prompt"
@@ -496,6 +528,15 @@ function Chats() {
           {!activeSessionId && user && !error && <p className="info-message">Click "New Chat" or select a past chat to begin.</p>}
         </div>
       </div>
+
+      {enlargedImage && (
+        <div className="image-modal-overlay" onClick={handleCloseEnlargedImage}>
+          <div className="image-modal-content">
+            <img src={enlargedImage} alt="Enlarged" className="enlarged-image" />
+            <button className="close-image-modal" onClick={handleCloseEnlargedImage}>×</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
