@@ -41,7 +41,7 @@ const EnhancedSignup = () => {
           setMessage('Google verification successful! Please enter the verification code sent to your email.');
           
           try {
-            const response = await fetch('http://localhost:5000/api/auth/check-verification-status', {
+            const response = await fetch('/api/auth/check-verification-status', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: storedEmail }),
