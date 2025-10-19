@@ -205,7 +205,7 @@ const EnhancedSignup = () => {
   return (
     <div className="auth-container">
       <img src="/assets/eduretrieve-logo.png" alt="logo" className="auth-container-img" />
-      <div className="auth-form-card">
+      <div className="auth-form-cards">
         <div className="auth-header-flex">
           <h2>Sign Up</h2>
           <img src="/assets/eduretrieve-logo.png" alt="logo" className="auth-header-flex-img" />

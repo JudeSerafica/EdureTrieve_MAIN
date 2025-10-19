@@ -20,60 +20,6 @@ function LoginPage() {
     checkUser();
   }, [navigate]);
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event, session?.user?.email);
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          await syncUserProfile(session.user);
-          navigate('/dashboard/home');
-        }
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('User signed out');
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const syncUserProfile = async (user) => {
-    try {
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (!existingProfile) {
-        console.log('Creating profile for user:', user.id);
-        
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([{
-            id: user.id,
-            email: user.email,
-            username: user.user_metadata?.full_name?.split(' ')[0] || 
-                     user.user_metadata?.name?.split(' ')[0] || 
-                     user.email.split('@')[0],
-            fullName: user.user_metadata?.full_name || 
-                     user.user_metadata?.name || '',
-            pfpUrl: user.user_metadata?.avatar_url || 
-                   user.user_metadata?.picture || '',
-            google_verified: !!user.user_metadata?.iss,
-            created_at: new Date().toISOString()
-          }]);
-
-        if (insertError) {
-          console.warn('Profile creation warning:', insertError.message);
-        }
-      }
-    } catch (error) {
-      console.warn('Profile sync error:', error.message);
-    }
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -114,29 +60,6 @@ function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-  setError('');
-  setLoading(true);
-
-  try {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard/home`
-      }
-    });
-
-    if (error) {
-      console.error('Google OAuth error:', error);
-      setError('Google login failed: ' + error.message);
-    }
-  } catch (err) {
-    console.error('Google login error:', err);
-    setError('Google login failed. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
 
   const handleResendVerification = async () => {
     if (!email.trim()) {
@@ -236,19 +159,6 @@ function LoginPage() {
             {loading ? 'Signing in...' : 'Login'}
           </button>
         </form>
-
-        <div className="auth-divider">
-          <span>OR</span>
-        </div>
-
-        <button 
-          type="button" 
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="google-login-button"
-        >
-          {loading ? 'Redirecting...' : 'Continue with Google'}
-        </button>
 
         {error && (
           <div className="auth-message error">

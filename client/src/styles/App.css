@@ -5,7 +5,7 @@ html, body, #root, .App {
     min-height: 100vh;
     font-family: 'Inter', sans-serif;
     color: #333;
-    background-color: #f0f2f5;
+    background: linear-gradient(180deg, #0f172a, #001652, #0f172a);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -40,8 +40,9 @@ button:disabled {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #0e1628;
+    background: linear-gradient(180deg, #0f172a, #001652,  #0f172a);
 }
+
 .auth-container-img {
     width: 400px;
     height: 400px;
@@ -53,10 +54,17 @@ button:disabled {
     background-color: white;
     padding: 12px 60px;
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(37, 31, 210, 0.4);
     transition: 0.5s;
 }
-.auth-container-img:hover, .auth-form-card:hover{
+
+.auth-form-cards{
+    background-color: white;
+    padding: 12px 60px;
+    border-radius: 12px;
+    transition: 0.5s;
+}
+
+.auth-container-img:hover{
     box-shadow: 0 4px 20px rgba(37, 31, 210, 0.9);
 }
 .auth-header-flex{
@@ -110,13 +118,13 @@ input[type="text"] {
 input[type="email"]:focus,
 input[type="password"]:focus,
 input[type="text"]:focus {
-    border-color: #007bff;
+    border-color: #3458bb;
     outline: none;
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
 }
 
 button[type="submit"] {
-    background-color: #007bff;
+    background-color: #3458bb;
     color: white;
     padding: 12px 15px;
     border: none;
@@ -137,7 +145,7 @@ button[type="submit"] {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    background-color: #007bff;
+    background-color: #3458bb;
     border: none;
     width: 100%;
     margin-top: 15px;
@@ -160,7 +168,7 @@ button[type="submit"] {
 }
 
 button[type="submit"]:hover, .google-button:hover {
-    background-color: #0056b3;
+    background-color: #1e3a8a;
     transform: translateY(-2px);
 }
 
@@ -169,19 +177,19 @@ button[type="submit"]:active, .google-button:active {
 }
 
 .a-left {
-    color: #007bff;
+    color: #3458bb;
     text-decoration: none;
     transition: color 0.3s ease;
 }
 
 a {
-    color: #007bff;
+    color: #3458bb;
     text-decoration: none;
     transition: color 0.3s ease;
 }
 
 a:hover {
-    color: #0056b3;
+    color: #1e3a8a;
     text-decoration: underline;
 }
 
@@ -219,7 +227,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .auth-form-card p a {
-    color: #007bff;
+    color: #3458bb;
     text-decoration: none;
     font-weight: 600;
 }
@@ -249,6 +257,25 @@ p#message, .auth-form-card .auth-message.success {
   font-size: 65px;
   font-weight: bold;
   color: #3458bb;
+}
+
+/* Homepage button styles */
+.homepage-button {
+  display: inline-block;
+  padding: 0.8rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: #ffffff;
+  background-color: #3458bb;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.homepage-button:hover {
+  background-color: #1e3a8a;
+  transform: translateY(-2px);
 }
 
 /* Keep search bar styling */
@@ -286,7 +313,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .gsc-search-button-v2:hover {
-  background: #1d4ed8 !important; /* darker blue on hover */
+  background: #1e3a8a !important; /* darker blue on hover */
 }
 
 /* Center search results */
@@ -344,7 +371,7 @@ p#message, .auth-form-card .auth-message.success {
         .verification-note {
           background-color: #e3f2fd;
           border: 1px solid #bbdefb;
-          color: #0d47a1;
+          color: #1e3a8a;
           padding: 10px;
           border-radius: 5px;
           margin-top: 15px;
@@ -482,7 +509,7 @@ p#message, .auth-form-card .auth-message.success {
         .google-login-button {
           width: 100%;
           padding: 12px;
-          background-color: #4285f4;
+          background-color: #3458bb;
           color: white;
           border: none;
           border-radius: 5px;
@@ -492,7 +519,7 @@ p#message, .auth-form-card .auth-message.success {
         }
 
         .google-login-button:hover:not(:disabled) {
-          background-color: #357ae8;
+          background-color: #1e3a8a;
         }
 
         .google-login-button:disabled {
@@ -503,7 +530,7 @@ p#message, .auth-form-card .auth-message.success {
         .link-button {
           background: none;
           border: none;
-          color: #007bff;
+          color: #3458bb;
           text-decoration: underline;
           cursor: pointer;
           font-size: inherit;
@@ -511,7 +538,7 @@ p#message, .auth-form-card .auth-message.success {
         }
 
         .link-button:hover:not(:disabled) {
-          color: #0056b3;
+          color: #1e3a8a;
         }
 
         .verification-section {
@@ -569,7 +596,7 @@ p#message, .auth-form-card .auth-message.success {
         }
 
         .auth-link a {
-          color: #007bff;
+          color: #3458bb;
           text-decoration: none;
         }
 
@@ -945,7 +972,7 @@ p#message, .auth-form-card .auth-message.success {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #007bff;
+  color: #3458bb;
 }
 
 .remove-pfp-btn {
@@ -1098,7 +1125,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .confirm-button {
-  background-color: #e74c3c;
+  background-color: #d43d2c;
   color: rgba(255, 255, 255, 0.938);
   border: none;
   padding: 10px 20px;
@@ -1109,11 +1136,11 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .confirm-button:hover {
-  background-color: #c0392b;
+  background-color: #a12315;
 }
 
 .cancel-button {
-  background-color: #007bff;
+  background-color: #3458bb;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -1124,13 +1151,13 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .cancel-button:hover {
-  background-color: #0056b3;
+  background-color: #1e3a8a;
 }
 
 .sidebar-logo-small {
     font-size: 1.8em;
     font-weight: bold;
-    color: #007bff;
+    color: #3458bb;
     text-align: center;
     margin-bottom: 30px;
     padding-bottom: 15px;
@@ -1498,7 +1525,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .view-file-button:hover {
-  background-color: #0b56a5;
+  background-color: #1e3a8a;
 }
 
 .verification-box {
@@ -1553,7 +1580,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .floating-upload-button:hover {
-  background-color: #2563eb;
+  background-color: #1e3a8a;
 }
 
 .module-card {
@@ -1688,7 +1715,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .add-folder-button:hover {
-  background: #163273;
+  background: #1e3a8a;
 }
 
 .saves-main {
@@ -1835,7 +1862,7 @@ p#message, .auth-form-card .auth-message.success {
 
         .progress-fill {
           height: 100%;
-          background-color: #007bff;
+          background-color: #3458bb;
           transition: width 0.3s ease;
         }
 
@@ -2092,7 +2119,7 @@ p#message, .auth-form-card .auth-message.success {
 
 .modals-box input[type="text"]:focus,
 .modals-box textarea:focus {
-  border-color: #0c58a8;
+  border-color: #1e3a8a;
   outline: none;
 }
 
@@ -2116,13 +2143,13 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .modals-buttons button[type="submit"] {
-  background-color: #0c58a8;
+  background-color: #3458bb;
   font-size: 18px;
   color: white;
 }
 
 .modals-buttons button[type="submit"]:hover {
-  background-color: #0c58a8;
+  background-color: #1e3a8a;
 }
 
 .modals-buttons button[type="button"] {
@@ -2278,7 +2305,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .pfp-upload-button:hover {
-    background-color: #0056b3;
+    background-color: #1e3a8a;
 }
 
 .profile-info-grid {
@@ -2341,7 +2368,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .profile-actions button:first-child:hover {
-  background-color: #396dce;
+  background-color: #1e3a8a;
 }
 
 .profile-actions .cancel-button {
@@ -2447,7 +2474,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .upload-form button[type="submit"]:hover:not(:disabled) {
-    background-color: #0056b3;
+    background-color: #1e3a8a;
 }
 
 .upload-form button[type="submit"]:disabled {
@@ -2486,7 +2513,7 @@ p#message, .auth-form-card .auth-message.success {
   font-weight: 500;
 }
 .view-file-link:hover {
-  color: #0056b3;
+  color: #1e3a8a;
 }
 
 .loading-full-page {
@@ -2558,7 +2585,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .new-chat-button:hover {
-    background-color: #0056b3;
+    background-color: #1e1e1e;
 }
 
 .new-chat-button:disabled {
@@ -2881,7 +2908,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .send-button:hover {
-    background-color: #0056b3;
+    background-color: #1e3a8a;
     transform: translateY(-2px);
 }
 
