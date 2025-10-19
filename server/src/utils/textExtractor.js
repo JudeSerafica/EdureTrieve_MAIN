@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import * as pdfParse from 'pdf-parse';
 import * as mammoth from 'mammoth';
 import { createWorker } from 'tesseract.js';
+import PPTX2Json from 'pptx2json';
+
+console.log('[textExtractor] v2 loader active');
 
 /**
  * Extracts text content from various file types
@@ -12,22 +14,22 @@ import { createWorker } from 'tesseract.js';
  */
 async function extractTextFromFile(filePath, mimeType) {
   try {
-    const fileExtension = path.extname(filePath).toLowerCase();
-
-    switch (fileExtension) {
-      case '.pdf':
+    switch (mimeType) {
+      case 'application/pdf':
         return await extractFromPDF(filePath);
-      case '.docx':
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         return await extractFromDOCX(filePath);
-      case '.txt':
+      case 'text/plain':
         return await extractFromTXT(filePath);
-      case '.jpg':
-      case '.jpeg':
-      case '.png':
-      case '.gif':
+      case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+        return await extractFromPPTX(filePath);
+      case 'image/jpeg':
+      case 'image/png':
+      case 'image/gif':
+      case 'image/webp':
         return await extractFromImage(filePath);
       default:
-        throw new Error(`Unsupported file type: ${fileExtension}`);
+        throw new Error(`Unsupported MIME type: ${mimeType}`);
     }
   } catch (error) {
     console.error('Error extracting text from file:', error);
@@ -37,13 +39,37 @@ async function extractTextFromFile(filePath, mimeType) {
 
 /**
  * Extract text from PDF files
+ * Supports pdf-parse v1 (default function) and v2 (PDFParse class)
  */
 async function extractFromPDF(filePath) {
   try {
     const dataBuffer = fs.readFileSync(filePath);
-    const data = await pdfParse(dataBuffer);
-    return data.text;
+    const mod = await import('pdf-parse');
+
+    let text = '';
+
+    if (typeof mod?.PDFParse === 'function') {
+      console.log('[textExtractor] using PDFParse class (v2)');
+      const parser = new mod.PDFParse({ data: dataBuffer });
+      const result = await parser.getText();
+      await parser.destroy();
+      text = result?.text || '';
+    } else if (typeof mod?.default === 'function') {
+      console.log('[textExtractor] using default function (v1)');
+      const result = await mod.default(dataBuffer);
+      text = (result && typeof result === 'object' && 'text' in result) ? result.text : (typeof result === 'string' ? result : '');
+    } else if (typeof mod === 'function') {
+      console.log('[textExtractor] using module as function (interop)');
+      const result = await mod(dataBuffer);
+      text = (result && typeof result === 'object' && 'text' in result) ? result.text : (typeof result === 'string' ? result : '');
+    } else {
+      console.error('[textExtractor] unsupported pdf-parse export shape:', Object.keys(mod || {}));
+      throw new Error('Unsupported pdf-parse export shape');
+    }
+
+    return text;
   } catch (error) {
+    console.error('[textExtractor] PDF extraction error:', error);
     throw new Error(`PDF extraction failed: ${error.message}`);
   }
 }
@@ -72,6 +98,37 @@ async function extractFromTXT(filePath) {
 }
 
 /**
+ * Extract text from PPTX files
+ * Handles both constructor and function export styles
+ */
+async function extractFromPPTX(filePath) {
+  try {
+    let pptx;
+    try {
+      // Some versions expose a class
+      pptx = new PPTX2Json(filePath);
+    } catch (_e) {
+      // Fallback: some builds expose a function default export
+      const mod = await import('pptx2json');
+      const fn = mod?.default ?? mod;
+      pptx = await fn(filePath);
+    }
+
+    let text = '';
+    if (pptx?.slides) {
+      pptx.slides.forEach(slide => {
+        if (slide?.text) {
+          text += slide.text + '\n';
+        }
+      });
+    }
+    return text.trim();
+  } catch (error) {
+    throw new Error(`PPTX extraction failed: ${error.message}`);
+  }
+}
+
+/**
  * Extract text from image files using OCR
  */
 async function extractFromImage(filePath) {
@@ -91,5 +148,6 @@ async function extractFromImage(filePath) {
 
 export {
   extractTextFromFile,
-  extractFromImage
+  extractFromImage,
+  extractFromPPTX
 };

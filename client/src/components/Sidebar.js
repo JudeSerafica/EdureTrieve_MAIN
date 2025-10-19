@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { FaHome, FaComments, FaBookmark, FaSignOutAlt, FaSearch, FaBars, FaUserCircle, FaChartBar } from 'react-icons/fa';
 import ProfileModal from './ProfileModal';
@@ -7,6 +7,15 @@ function Sidebar({ onLogout, user }) {
   const [showModal, setShowModal] = useState(false);
   const [isOpen, setIsOpen] = useState(true); // ✅ control open/close sidebar
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogout = () => {
     setShowModal(true);
@@ -56,7 +65,28 @@ function Sidebar({ onLogout, user }) {
               <FaChartBar className="sidebar-icon" /> {isOpen && 'Analytics'}
             </NavLink>
           </div>
-        
+
+          {/* Date and Time Display */}
+          {isOpen && (
+            <div className="sidebar-datetime">
+              <div className="sidebar-date">
+                {currentTime.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </div>
+              <div className="sidebar-time">
+                {currentTime.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="sidebar-bottom">
             <button className="logout-button" onClick={handleLogout}>
               <FaSignOutAlt className="sidebar-icon" /> {isOpen && ''}

@@ -172,18 +172,19 @@ export const generateContentApi = async (user, prompt, conversationId) => {
 };
 
 /**
- * Processes an uploaded image through OCR and AI analysis, then saves to localStorage
+ * Processes an uploaded file through text extraction and AI analysis, then saves to localStorage
  */
-export const processChatImageApi = async (user, imageFile, conversationId, customPrompt = null) => {
-  console.log('ChatHelpers.js: processChatImageApi called with:', {
+export const processChatFileApi = async (user, file, conversationId, customPrompt = null) => {
+  console.log('ChatHelpers.js: processChatFileApi called with:', {
     userId: user?.id,
-    imageFileName: imageFile?.name,
-    imageFileSize: imageFile?.size,
+    fileName: file?.name,
+    fileSize: file?.size,
+    fileType: file?.type,
     conversationId
   });
 
-  if (!imageFile) {
-    throw new Error('No image file provided');
+  if (!file) {
+    throw new Error('No file provided');
   }
 
   if (!conversationId) {
@@ -191,35 +192,38 @@ export const processChatImageApi = async (user, imageFile, conversationId, custo
   }
 
   const formData = new FormData();
-  formData.append('image', imageFile);
+  formData.append('file', file);
   formData.append('conversationId', conversationId);
   if (customPrompt) {
     formData.append('prompt', customPrompt);
   }
 
-  const res = await fetch('http://localhost:5000/api/chat/process-image', {
+  const res = await fetch('http://localhost:5000/api/chat/process-file', {
     method: 'POST',
     body: formData,
   });
 
   const result = await res.json();
   if (!res.ok) {
-    throw new Error(result.error || 'Failed to process image');
+    throw new Error(result.error || 'Failed to process file');
   }
 
-  // Create image preview URL for display
-  const imagePreview = URL.createObjectURL(imageFile);
+  // Create file preview URL for display (only for images)
+  const isImage = file.type.startsWith('image/');
+  const filePreview = isImage ? URL.createObjectURL(file) : null;
 
   // Create message objects
-  const imageMessage = {
+  const fileMessage = {
     type: 'user',
-    text: `[Image uploaded] ${result.extractedText}`,
+    text: `[${result.fileType === 'image' ? 'Image' : 'File'} uploaded] ${result.extractedText}`,
     timestamp: {
       _seconds: Math.floor(Date.now() / 1000),
       _nanoseconds: (Date.now() % 1000) * 1_000_000
     },
     conversationId,
-    imagePreview
+    filePreview,
+    fileName: result.fileName,
+    fileType: result.fileType
   };
 
   const aiMessage = {
@@ -234,10 +238,11 @@ export const processChatImageApi = async (user, imageFile, conversationId, custo
 
   // Save to localStorage like regular chat messages
   await saveChatEntryApi(user, {
-    prompt: imageMessage.text,
+    prompt: fileMessage.text,
     response: aiMessage.text,
-    timestamp: imageMessage.timestamp,
+    timestamp: fileMessage.timestamp,
     conversationId,
+    filePreview
   });
 
   return result;

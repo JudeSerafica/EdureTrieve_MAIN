@@ -22,11 +22,11 @@ const useAuthStatus = ({
       const session = data?.session;
 
       if (error) {
-        if (debug) console.error('❌ Error getting session:', error.message);
+        if (debug) console.error('Error getting session:', error.message);
         setUser(null);
       } else {
         setUser(session?.user || null);
-        if (debug && session?.user) console.log('✅ Session user:', session.user.id);
+        if (debug && session?.user) console.log('Session user:', session.user.id);
       }
 
       setAuthLoading(false);
@@ -41,9 +41,9 @@ const useAuthStatus = ({
       if (!isMounted) return;
 
       setUser(currentUser);
-      if (debug) console.log(`🔄 Auth event: ${event}`, currentUser?.id);
+      if (debug) console.log(`Auth event: ${event}`, currentUser?.id);
 
-      // 🔧 Insert profile if needed
+      // Insert profile if needed
       if (event === 'SIGNED_IN' && autoCreateProfile && currentUser) {
         const { data: existing, error: checkError } = await supabase
           .from('profiles')
@@ -59,9 +59,9 @@ const useAuthStatus = ({
           });
 
           if (insertErr && debug) {
-            console.error('❌ Insert profile error:', insertErr.message);
+            console.error('Insert profile error:', insertErr.message);
           } else if (debug) {
-            console.log('✅ Profile created for new user.');
+            console.log('Profile created for new user.');
           }
         }
       }
@@ -75,7 +75,7 @@ const useAuthStatus = ({
 
   useEffect(() => {
     if (!authLoading && autoRedirect && !user) {
-      if (debug) console.warn('➡️ Redirecting to /login (unauthenticated)');
+      if (debug) console.warn('Redirecting to /login (unauthenticated)');
       navigate('/login');
     }
   }, [authLoading, autoRedirect, user, navigate, debug]);
@@ -113,7 +113,7 @@ const useAuthStatus = ({
           setProtectedData(null);
           setDataError(err.message);
         }
-        if (debug) console.error('❌ Protected fetch error:', err.message);
+        if (debug) console.error('Protected fetch error:', err.message);
       }
     };
 

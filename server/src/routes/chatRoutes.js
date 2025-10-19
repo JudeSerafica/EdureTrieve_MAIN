@@ -4,22 +4,28 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { saveChatEntry, getChatHistory, deleteChatEntriesByConversationId } from '../model/userModel.js';
-import { extractFromImage } from '../utils/textExtractor.js';
+import { extractFromImage, extractTextFromFile } from '../utils/textExtractor.js';
 import authenticateToken from '../middleware/authMiddleware.js';
 import { generateContent } from '../model/Model.js';
 
-// Configure multer for image uploads
-const chatImageUpload = multer({
-  dest: 'uploads/chat-images/',
+// Configure multer for file uploads (images and documents)
+const chatFileUpload = multer({
+  dest: 'uploads/chat-files/',
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
+      cb(new Error('Only images, PDFs, DOCX, TXT, and PPTX files are allowed'), false);
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit for chat images
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit for chat files
 });
 
 // POST /api/chat/save
@@ -76,40 +82,47 @@ router.delete('/delete/:conversationId', authenticateToken, async (req, res) => 
   }
 });
 
-// POST /api/chat/process-image
-router.post('/process-image', chatImageUpload.single('image'), async (req, res) => {
+// POST /api/chat/process-file
+router.post('/process-file', chatFileUpload.single('file'), async (req, res) => {
   try {
     const { conversationId, prompt } = req.body;
     const userId = 'local-user'; // Mock user ID for localStorage approach
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({ error: 'No image file provided.' });
+      return res.status(400).json({ error: 'No file provided.' });
     }
 
     if (!conversationId) {
       return res.status(400).json({ error: 'Conversation ID is required.' });
     }
 
-    console.log('Processing chat image:', {
+    console.log('Processing chat file:', {
       userId,
       conversationId,
       filename: file.filename,
       originalName: file.originalname,
-      size: file.size
+      size: file.size,
+      mimetype: file.mimetype
     });
 
-    // Extract text from the uploaded image using OCR
-    const filePath = path.join(process.cwd(), 'uploads/chat-images', file.filename);
+    // Extract text from the uploaded file
+    const filePath = path.join(process.cwd(), 'uploads/chat-files', file.filename);
     let extractedText = '';
+    const isImage = file.mimetype.startsWith('image/');
 
     try {
-      extractedText = await extractFromImage(filePath);
-      console.log('OCR extraction successful, text length:', extractedText.length);
-    } catch (ocrError) {
-      console.error('OCR extraction failed:', ocrError);
-      // Continue with empty text if OCR fails
-      extractedText = '[Image uploaded - OCR processing failed]';
+      if (isImage) {
+        extractedText = await extractFromImage(filePath);
+        console.log('Image OCR extraction successful, text length:', extractedText.length);
+      } else {
+        extractedText = await extractTextFromFile(filePath, file.mimetype);
+        console.log('Document text extraction successful, text length:', extractedText.length);
+      }
+    } catch (extractionError) {
+      console.error('Text extraction failed:', extractionError);
+      // Continue with empty text if extraction fails
+      extractedText = `[${isImage ? 'Image' : 'File'} uploaded - text extraction failed]`;
     }
 
     // Clean up the uploaded file
@@ -120,9 +133,10 @@ router.post('/process-image', chatImageUpload.single('image'), async (req, res) 
     }
 
     // Generate AI response based on user's question + extracted text
+    const fileType = isImage ? 'image' : 'file';
     const aiPrompt = prompt
-      ? `${prompt}\n\nHere is the extracted text from the uploaded image:\n\n"${extractedText}"\n\nPlease answer the question using the image content.`
-      : `The user uploaded an image. Here is the extracted text from the image:\n\n"${extractedText}"\n\nPlease analyze this content and provide helpful insights or answer any questions the user might have about it.`;
+      ? `${prompt}\n\nHere is the extracted text from the uploaded ${fileType}:\n\n"${extractedText}"\n\nPlease answer the question using the ${fileType} content.`
+      : `The user uploaded a ${fileType}. Here is the extracted text from the ${fileType}:\n\n"${extractedText}"\n\nPlease analyze this content and provide helpful insights or answer any questions the user might have about it.`;
 
 
     const aiResponse = await generateContent(aiPrompt);
@@ -134,13 +148,15 @@ router.post('/process-image', chatImageUpload.single('image'), async (req, res) 
       _nanoseconds: (now % 1000) * 1_000_000
     };
 
-    // Save the image message and AI response to chat history
-    const imageMessage = {
+    // Save the file message and AI response to chat history
+    const fileMessage = {
       type: 'user',
-      text: `[Image uploaded] ${extractedText}`,
+      text: `[${isImage ? 'Image' : 'File'} uploaded] ${extractedText}`,
       timestamp,
       conversationId,
-      imageUrl: null // We don't store the image, just process it
+      fileUrl: null, // We don't store the file, just process it
+      fileName: file.originalname,
+      fileType: isImage ? 'image' : 'document'
     };
 
     const aiMessage = {
@@ -155,18 +171,23 @@ router.post('/process-image', chatImageUpload.single('image'), async (req, res) 
 
     // Return processed data - frontend will handle localStorage
     res.status(200).json({
-      message: 'Image processed successfully',
+      message: `${isImage ? 'Image' : 'File'} processed successfully`,
       extractedText,
       aiResponse,
-      conversationId
+      conversationId,
+      fileName: file.originalname,
+      fileType: isImage ? 'image' : 'document'
     });
 
   } catch (error) {
-    console.error('Error processing chat image:', error);
-    res.status(500).json({
-      error: 'Failed to process image',
-      details: error.message
-    });
+    console.error('Error processing chat file:', error);
+    // Ensure we always return JSON, never HTML
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Failed to process file',
+        details: error.message
+      });
+    }
   }
 });
 

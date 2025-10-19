@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useAuthStatus from '../hooks/useAuthStatus';
 import ReactMarkdown from 'react-markdown';
-import { FaPaperPlane, FaStop, FaPlus, FaComments, FaTrash, FaImage } from 'react-icons/fa';
+import { FaPaperPlane, FaStop, FaPlus, FaComments, FaTrash, FaFileUpload } from 'react-icons/fa';
 import {
   formatFirebaseTimestamp,
   generateUniqueId,
@@ -9,7 +9,7 @@ import {
   saveChatEntryApi,
   deleteChatSessionApi,
   generateContentApi,
-  processChatImageApi,
+  processChatFileApi,
   getUserChatKey
 } from '../utils/ChatHelpers';
 
@@ -22,8 +22,8 @@ function Chats() {
   const [error, setError] = useState('');
   const [chatHistorySessions, setChatHistorySessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
   const [enlargedImage, setEnlargedImage] = useState(null);
   const chatMessagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -57,8 +57,8 @@ function Chats() {
     setActiveChatMessages([]);
     setPrompt('');
     setError('');
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedFile(null);
+    setFilePreview(null);
   }, [activeChatMessages, activeSessionId]);
 
  useEffect(() => {
@@ -117,23 +117,29 @@ function Chats() {
     }
   }, [chatHistorySessions, user]);
 
-  const handleImageSelect = (e) => {
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target.result);
-      reader.readAsDataURL(file);
+      setSelectedFile(file);
+      const isImage = file.type.startsWith('image/');
+      if (isImage) {
+        const reader = new FileReader();
+        reader.onload = (e) => setFilePreview(e.target.result);
+        reader.readAsDataURL(file);
+      } else {
+        setFilePreview(null); // No preview for non-image files
+      }
     }
   };
 
-  const handleRemoveImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
 
   const handleImageDoubleClick = (imageSrc) => {
     setEnlargedImage(imageSrc);
@@ -145,7 +151,7 @@ function Chats() {
 
   const handleGenerateContent = async (e) => {
     e.preventDefault();
-    if (!prompt.trim() && !selectedImage) return;
+    if (!prompt.trim() && !selectedFile) return;
 
     setApiLoading(true);
     setError('');
@@ -157,12 +163,12 @@ function Chats() {
     }
 
     const currentPrompt = prompt;
-    const currentImage = selectedImage;
-    const currentImagePreview = imagePreview;
+    const currentFile = selectedFile;
+    const currentFilePreview = filePreview;
 
     setPrompt('');
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedFile(null);
+    setFilePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -174,31 +180,33 @@ function Chats() {
     };
 
     let currentConversationId = activeSessionId;
-    if (!currentConversationId || activeChatMessages.length === 0) {
+    if (!currentConversationId) {
       currentConversationId = generateUniqueId();
       setActiveSessionId(currentConversationId);
     }
 
-    // Handle image upload if present
-    if (currentImage) {
+    // Handle file upload if present
+    if (currentFile) {
       try {
-        console.log('Chats.js: Processing image upload');
-        const imageData = await processChatImageApi(user, currentImage, currentConversationId, currentPrompt || null);
+        console.log('Chats.js: Processing file upload');
+        const fileData = await processChatFileApi(user, currentFile, currentConversationId, currentPrompt || null);
 
         const newUserMessage = {
           type: 'user',
           text: currentPrompt
-            ? `${currentPrompt}\n\n[Image uploaded] ${imageData.extractedText}`
-            : `[Image uploaded] ${imageData.extractedText}`,
+            ? `${currentPrompt}\n\n[${fileData.fileType === 'image' ? 'Image' : 'File'} uploaded] ${fileData.extractedText}`
+            : `[${fileData.fileType === 'image' ? 'Image' : 'File'} uploaded] ${fileData.extractedText}`,
           timestamp: newTimestamp,
           conversationId: currentConversationId,
-          imagePreview: currentImagePreview
+          filePreview: currentFilePreview,
+          fileName: fileData.fileName,
+          fileType: fileData.fileType
         };
         setActiveChatMessages(prev => [...prev, newUserMessage]);
 
         const newAiMessage = {
           type: 'ai',
-          text: imageData.aiResponse,
+          text: fileData.aiResponse,
           timestamp: {
             _seconds: Math.floor(Date.now() / 1000),
             _nanoseconds: (Date.now() % 1000) * 1_000_000
@@ -218,13 +226,13 @@ function Chats() {
               session.messages = [...session.messages, newUserMessage, newAiMessage];
             }
             if (session.title === 'New Chat' || session.title.startsWith('Chat from')) {
-              session.title = 'Image Analysis Chat';
+              session.title = fileData.fileType === 'image' ? 'Image Analysis Chat' : 'Document Analysis Chat';
             }
             return updatedSessions;
           } else {
             return [{
               id: currentConversationId,
-              title: 'Image Analysis Chat',
+              title: fileData.fileType === 'image' ? 'Image Analysis Chat' : 'Document Analysis Chat',
               messages: [newUserMessage, newAiMessage]
             }, ...prevSessions];
           }
@@ -235,7 +243,7 @@ function Chats() {
           response: newAiMessage.text,
           timestamp: newTimestamp,
           conversationId: currentConversationId,
-          imagePreview: currentImagePreview,
+          filePreview: currentFilePreview,
         });
 
       } catch (err) {
@@ -336,8 +344,8 @@ function Chats() {
     setActiveSessionId(session.id);
     setPrompt('');
     setError('');
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedFile(null);
+    setFilePreview(null);
   };
 
   const handleDeleteChatSession = async (sessionIdToDelete) => {
@@ -447,15 +455,20 @@ function Chats() {
           {activeChatMessages.map((msg, index) => (
             <div key={index} className={`chat-message-card ${msg.type}-message`}>
               <div className="message-content">
-                {msg.imagePreview && (
+                {msg.filePreview && (
                   <div className="message-image-container">
                     <img
-                      src={msg.imagePreview}
-                      alt="Uploaded"
+                      src={msg.filePreview}
+                      alt="Uploaded image"
                       className="message-image"
-                      onClick={() => handleImageDoubleClick(msg.imagePreview)}
+                      onClick={() => handleImageDoubleClick(msg.filePreview)}
                       style={{ cursor: 'pointer' }}
                     />
+                  </div>
+                )}
+                {msg.fileName && !msg.filePreview && (
+                  <div className="message-file-info">
+                    <p>📄 {msg.fileName}</p>
                   </div>
                 )}
                 <ReactMarkdown>{msg.text}</ReactMarkdown>
@@ -478,48 +491,97 @@ function Chats() {
         </div>
 
         <div className="chat-input-area">
-          {imagePreview && (
-            <div className="image-preview-container">
-              <img src={imagePreview} alt="Selected" className="image-preview" />
+          {filePreview && (
+            <div className="file-preview-container" style={{ position: 'relative', display: 'inline-block' }}>
+              <img src={filePreview} alt="Selected file" className="file-preview" style={{ maxWidth: '250px', maxHeight: '250px' }} />
               <button
                 type="button"
                 className="remove-image-button"
-                onClick={handleRemoveImage}
-                title="Remove image"
+                onClick={handleRemoveFile}
+                title="Remove file"
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-20px',
+                  backgroundColor: '#e04958',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '10px',
+                  height: '10px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#c82333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#e04958'}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {selectedFile && !filePreview && (
+            <div className="file-info-container" style={{ position: 'relative', display: 'inline-block' }}>
+              <p className="file-info">📄 {selectedFile.name}</p>
+              <button
+                type="button"
+                className="remove-file-button"
+                onClick={handleRemoveFile}
+                title="Remove file"
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-20px',
+                  backgroundColor: '#e04958',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '5px',
+                  height: '5px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#c82333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#e04958'}
               >
                 ×
               </button>
             </div>
           )}
           <form onSubmit={handleGenerateContent} className="chat-input-form">
-            <div className="input-with-image">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageSelect}
-                accept="image/*"
-                style={{ display: 'none' }}
-                id="image-upload"
-              />
-              <label htmlFor="image-upload" className="image-upload-button">
-                <FaImage size="1.2em"/>
-              </label>
-              <textarea
-                id="prompt"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows="1"
-                placeholder={user ? "Type your message or upload an image..." : "Please log in to chat."}
-                disabled={apiLoading || !user || !activeSessionId}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleGenerateContent(e);
-                  }
-                }}
-              ></textarea>
-            </div>
-            <button className="send-button" disabled={apiLoading || !user || !activeSessionId || (!prompt.trim() && !selectedImage)}>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*,.pdf,.docx,.txt,.pptx"
+              style={{ display: 'none' }}
+              id="file-upload"
+            />
+            <label htmlFor="file-upload" className="file-upload-button">
+              <FaFileUpload color="#3458bb" size="1.5em"/>
+            </label>
+            <textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows="1"
+              placeholder={user ? "Type your message or upload a file or image..." : "Please log in to chat."}
+              disabled={apiLoading || !user || !activeSessionId}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGenerateContent(e);
+                }
+              }}
+            ></textarea>
+            <button className="send-button" disabled={apiLoading || !user || !activeSessionId || (!prompt.trim() && !selectedFile)}>
               {apiLoading ? <FaStop className="stop-icon" size="1.3em" /> : <FaPaperPlane className='send-icon' size="1.3em" />}
             </button>
           </form>
