@@ -16,6 +16,7 @@ function Dashboard() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('latest');
+  const [dateFilter, setDateFilter] = useState('all');
 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -441,11 +442,49 @@ function Dashboard() {
     );
   }
 
+  const getDateFilter = (dateString) => {
+    if (dateFilter === 'all') return true;
+    const moduleDate = new Date(dateString);
+    const now = new Date();
+    const diffTime = now - moduleDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+    switch (dateFilter) {
+      case '7days': return diffDays <= 7;
+      case '30days': return diffDays <= 30;
+      case 'month': return moduleDate.getMonth() === now.getMonth() && moduleDate.getFullYear() === now.getFullYear();
+      default: return true;
+    }
+  };
+
   const filteredModules = modules
-    .filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(m => {
+      const matchesSearch = m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           m.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDate = getDateFilter(m.uploadedAt);
+      return matchesSearch && matchesDate;
+    })
     .sort((a, b) => {
-      if (sortOption === 'alphabetical') return a.title.localeCompare(b.title);
-      return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+      switch (sortOption) {
+        case 'oldest':
+          return new Date(a.uploadedAt) - new Date(b.uploadedAt);
+        case 'alphabetical':
+          return a.title.localeCompare(b.title);
+        case 'fileSize':
+          const aSize = fileInfo[a.id]?.size ? parseFloat(fileInfo[a.id].size) : 0;
+          const bSize = fileInfo[b.id]?.size ? parseFloat(fileInfo[b.id].size) : 0;
+          return aSize - bSize;
+        case 'fileSizeDesc':
+          const aSizeDesc = fileInfo[a.id]?.size ? parseFloat(fileInfo[a.id].size) : 0;
+          const bSizeDesc = fileInfo[b.id]?.size ? parseFloat(fileInfo[b.id].size) : 0;
+          return bSizeDesc - aSizeDesc;
+        case 'fileType':
+          const aType = fileInfo[a.id]?.type || '';
+          const bType = fileInfo[b.id]?.type || '';
+          return aType.localeCompare(bType);
+        default: // 'latest'
+          return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+      }
     });
 
   const totalPages = Math.ceil(filteredModules.length / modulesPerPage);
@@ -478,7 +517,23 @@ function Dashboard() {
               value={sortOption}
             >
               <option value="latest">Newest First</option>
-              <option value="alphabetical">A–Z</option>
+              <option value="oldest">Oldest First</option>
+              <option value="alphabetical">A–Z (Title)</option>
+              <option value="fileSize">File Size (Smallest)</option>
+              <option value="fileSizeDesc">File Size (Largest)</option>
+            </select>
+            <select
+              onChange={e => {
+                setDateFilter(e.target.value);
+                setCurrentPage(1); // Reset to first page when filtering
+              }}
+              className="sort-dropdown"
+              value={dateFilter}
+            >
+              <option value="all">All Time</option>
+              <option value="7days">Last 7 Days</option>
+              <option value="30days">Last 30 Days</option>
+              <option value="month">This Month</option>
             </select>
             <button onClick={() => setShowUploadModal(true)} className="floating-upload-button">
               Upload Module

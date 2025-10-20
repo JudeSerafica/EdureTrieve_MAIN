@@ -108,6 +108,11 @@ function UserProfile({ user }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to update profile.');
 
+      // Update Supabase user metadata to sync with sidebar display
+      await supabase.auth.updateUser({
+        data: { full_name: fullName }
+      });
+
       setMessage(result.message || '✅ Profile updated!');
       setIsEditing(false);
     } catch (err) {

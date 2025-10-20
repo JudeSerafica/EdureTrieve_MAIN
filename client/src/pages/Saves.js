@@ -13,6 +13,7 @@ function Saves() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState('recent');
+  const [dateFilter, setDateFilter] = useState('all');
 
   const [showViewer, setShowViewer] = useState(false);
   const [currentFileUrl, setCurrentFileUrl] = useState(null);
@@ -365,6 +366,21 @@ useEffect(() => {
     }
   };
 
+  const getDateFilter = (dateString) => {
+    if (dateFilter === 'all') return true;
+    const moduleDate = new Date(dateString);
+    const now = new Date();
+    const diffTime = now - moduleDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+    switch (dateFilter) {
+      case '7days': return diffDays <= 7;
+      case '30days': return diffDays <= 30;
+      case 'month': return moduleDate.getMonth() === now.getMonth() && moduleDate.getFullYear() === now.getFullYear();
+      default: return true;
+    }
+  };
+
   // ✅ Filter modules by folder + search + sort
   const filteredSavedModules = savedModules
     .filter((module) => {
@@ -372,14 +388,35 @@ useEffect(() => {
       if (activeFolder === 'uncategorized') return !module.folder_id;
       return module.folder_id === activeFolder;
     })
-    .filter((module) => module.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter((module) => {
+      const matchesSearch = module.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           module.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesDate = getDateFilter(module.savedAt || module.uploadedAt);
+      return matchesSearch && matchesDate;
+    })
     .sort((a, b) => {
-      if (sortOption === 'recent') {
-        return new Date(b.uploadedAt) - new Date(a.uploadedAt);
-      } else if (sortOption === 'title') {
-        return a.title.localeCompare(b.title);
+      switch (sortOption) {
+        case 'oldest':
+          return new Date(a.uploadedAt) - new Date(b.uploadedAt);
+        case 'recentlySaved':
+          return new Date(b.savedAt) - new Date(a.savedAt);
+        case 'title':
+          return a.title.localeCompare(b.title);
+        case 'fileSize':
+          const aSize = fileInfo[a.id]?.size ? parseFloat(fileInfo[a.id].size) : 0;
+          const bSize = fileInfo[b.id]?.size ? parseFloat(fileInfo[b.id].size) : 0;
+          return aSize - bSize;
+        case 'fileSizeDesc':
+          const aSizeDesc = fileInfo[a.id]?.size ? parseFloat(fileInfo[a.id].size) : 0;
+          const bSizeDesc = fileInfo[b.id]?.size ? parseFloat(fileInfo[b.id].size) : 0;
+          return bSizeDesc - aSizeDesc;
+        case 'fileType':
+          const aType = fileInfo[a.id]?.type || '';
+          const bType = fileInfo[b.id]?.type || '';
+          return aType.localeCompare(bType);
+        default: // 'recent'
+          return new Date(b.uploadedAt) - new Date(a.uploadedAt);
       }
-      return 0;
     });
 
   if (authLoading) return <div className="dashboard-loading">Checking authentication...</div>;
@@ -501,8 +538,21 @@ useEffect(() => {
                 onChange={(e) => setSortOption(e.target.value)}
                 className="sort-dropdown"
               >
-                <option value="recent">Sort by Recent</option>
-                <option value="title">Sort by Title</option>
+                <option value="recentlySaved">Recently Saved</option>
+                <option value="oldest">Oldest First</option>
+                <option value="title">A–Z (Title)</option>
+                <option value="fileSize">File Size (Smallest)</option>
+                <option value="fileSizeDesc">File Size (Largest)</option>
+              </select>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="sort-dropdown"
+              >
+                <option value="all">All Time</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="month">This Month</option>
               </select>
             </div>
           </div>

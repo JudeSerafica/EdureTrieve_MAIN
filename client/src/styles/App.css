@@ -1001,7 +1001,7 @@ p#message, .auth-form-card .auth-message.success {
 
 .dashboard-sidebar {
   width: 250px;
-  background: linear-gradient(180deg, #0f172a, #1e3a8a,   #3458bb);
+  background: linear-gradient(180deg, #0f172a, #1e3a8a, #3458bb, #3458bb);
   color: white;
   padding: 33.5px 0;
   display: flex;
@@ -1653,7 +1653,7 @@ p#message, .auth-form-card .auth-message.success {
 }
 
 .folders-sidebar {
-  width: 250px;
+  width: 220px;
   background: #f9fbfd;
   border-right: 1px solid #ddd;
   padding: 20px;

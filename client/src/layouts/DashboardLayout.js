@@ -47,7 +47,7 @@ function DashboardLayout() {
     try {
       await supabase.auth.signOut();
       console.log('User logged out');
-      navigate('/login');
+      navigate('/');
     } catch (error) {
       console.error('Logout error:', error.message);
     }

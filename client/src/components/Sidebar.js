@@ -43,7 +43,7 @@ function Sidebar({ onLogout, user }) {
             {user && user.user_metadata && user.user_metadata.full_name && (
               <div className="sidebar-profile-info">
                 <div className="sidebar-profile-name">{user.user_metadata.full_name}</div>
-                <div className="sidebar-profile-divider"></div>
+                <div className="sidebar-profile-divider" style={{ width: `${Math.min(user.user_metadata.full_name.length * 10, 200)}px` }}></div>
               </div>
             )}
           </div>
@@ -124,3 +124,4 @@ function Sidebar({ onLogout, user }) {
 }
 
 export default Sidebar;
+

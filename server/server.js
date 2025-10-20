@@ -528,8 +528,54 @@ app.post('/api/generate-content', async (req, res) => {
   try {
     console.log('🚀 API Request received:', { prompt: prompt.substring(0, 50) + '...', userId, conversationId });
 
+    // Fetch conversation history to maintain context
+    let conversationHistory = [];
+    try {
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('prompt, response, timestamp')
+        .eq('user_id', userId)
+        .eq('conversationId', conversationId)
+        .order('timestamp', { ascending: true });
+
+      if (!error && data) {
+        conversationHistory = data;
+      }
+    } catch (historyError) {
+      console.warn('⚠️ Could not fetch conversation history:', historyError.message);
+    }
+
+    // Build context-aware prompt
+    let contextPrompt = prompt;
+
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Sort messages by timestamp
+      const sortedHistory = conversationHistory.sort((a, b) => {
+        const aTime = a.timestamp?._seconds || a.timestamp?.seconds || 0;
+        const bTime = b.timestamp?._seconds || b.timestamp?.seconds || 0;
+        return aTime - bTime;
+      });
+
+      // Build conversation context (limit to last 10 exchanges to avoid token limits)
+      const recentMessages = sortedHistory.slice(-20); // Last 10 user-AI pairs
+      const contextMessages = [];
+
+      for (const msg of recentMessages) {
+        if (msg.prompt) {
+          contextMessages.push(`User: ${msg.prompt}`);
+        }
+        if (msg.response) {
+          contextMessages.push(`Assistant: ${msg.response}`);
+        }
+      }
+
+      if (contextMessages.length > 0) {
+        contextPrompt = `${contextMessages.join('\n\n')}\n\nUser: ${prompt}\n\nAssistant:`;
+      }
+    }
+
     // 🧠 Generate content using Groq with RAG (userId enables module retrieval)
-    const content = await generateContent(prompt, userId);
+    const content = await generateContent(contextPrompt, userId);
 
     console.log('📤 Sending response back to client:', { contentLength: content ? content.length : 0 });
 
