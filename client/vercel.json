@@ -15,7 +15,6 @@
       "dest": "/index.html"
     }
   ],
-  "env": {
-    "CI": "false"
-  }
+  "buildCommand": "npm run build",
+  "outputDirectory": "build"
 }
