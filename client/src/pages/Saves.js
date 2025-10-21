@@ -27,6 +27,8 @@ function Saves() {
     { id: 'uncategorized', name: 'Uncategorized' }
   ]);
   const [activeFolder, setActiveFolder] = useState('default');
+  const [currentPage, setCurrentPage] = useState(1);
+  const modulesPerPage = 40;
 
   // 🆕 Modal states
   const [showModal, setShowModal] = useState(false);
@@ -392,7 +394,7 @@ useEffect(() => {
     })
     .filter((module) => {
       const matchesSearch = module.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           module.description.toLowerCase().includes(searchQuery.toLowerCase());
+                            module.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesDate = getDateFilter(module.savedAt || module.uploadedAt);
       return matchesSearch && matchesDate;
     })
@@ -421,6 +423,23 @@ useEffect(() => {
       }
     });
 
+  const totalPages = Math.ceil(filteredSavedModules.length / modulesPerPage);
+  const indexOfLastModule = currentPage * modulesPerPage;
+  const indexOfFirstModule = indexOfLastModule - modulesPerPage;
+  const currentModules = filteredSavedModules.slice(indexOfFirstModule, indexOfLastModule);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
   if (authLoading) return <div className="dashboard-loading">Checking authentication...</div>;
   if (!user) return <div className="dashboard-not-logged-in">Please log in to view your saved modules.</div>;
 
@@ -435,9 +454,12 @@ useEffect(() => {
               key={folder.id}
               className={`folder-item ${activeFolder === folder.id ? 'active' : ''}`}
             >
-              <span 
+              <span
                 className="folder-name"
-                onClick={() => setActiveFolder(folder.id)}
+                onClick={() => {
+                  setActiveFolder(folder.id);
+                  setCurrentPage(1); // Reset to first page when changing folders
+                }}
               >
                 {folder.name}
               </span>
@@ -532,12 +554,18 @@ useEffect(() => {
                 type="text"
                 placeholder="🔍 Search modules..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1); // Reset to first page when searching
+                }}
                 className="search-bar"
               />
               <select
                 value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
+                onChange={(e) => {
+                  setSortOption(e.target.value);
+                  setCurrentPage(1); // Reset to first page when sorting
+                }}
                 className="sort-dropdown"
               >
                 <option value="recentlySaved">Recently Saved</option>
@@ -548,7 +576,10 @@ useEffect(() => {
               </select>
               <select
                 value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  setCurrentPage(1); // Reset to first page when filtering
+                }}
                 className="sort-dropdown"
               >
                 <option value="all">All Time</option>
@@ -590,7 +621,7 @@ useEffect(() => {
 
         {!loading && (
           <div className="module-list" style={{ transition: 'all 0.3s ease' }}>
-            {filteredSavedModules.map((module) => (
+            {currentModules.map((module) => (
               <div key={module.id} className="module-card-hoverable" style={{ transition: 'all 0.3s ease' }}>
               <div className="module-card-header">
                 <h3>{module.title}</h3>
@@ -743,6 +774,54 @@ useEffect(() => {
             )}
             </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="pagination" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '20px 0' }}>
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              style={{
+                margin: '0 5px',
+                padding: '5px 10px',
+                border: '1px solid #ccc',
+                background: 'white',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                style={{
+                  margin: '0 5px',
+                  padding: '5px 10px',
+                  border: '1px solid #ccc',
+                  background: page === currentPage ? '#3458bb' : 'white',
+                  color: page === currentPage ? 'white' : 'black',
+                  cursor: 'pointer'
+                }}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              style={{
+                margin: '0 5px',
+                padding: '5px 10px',
+                border: '1px solid #ccc',
+                background: 'white',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+
+            </button>
           </div>
         )}
       </div>
@@ -937,6 +1016,7 @@ useEffect(() => {
           border-radius: 5px;
           margin: 20px;
         }
+
       `}</style>
     </div>
   );

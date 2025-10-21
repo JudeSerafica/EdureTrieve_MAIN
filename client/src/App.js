@@ -104,7 +104,7 @@ function App() {
       <AuthProvider>
         <ErrorBoundary>
           <AuthWrapper />
-          <ToastContainer position="top-right" autoClose={2000} />
+          <ToastContainer position="top-right" autoClose={500} />
         </ErrorBoundary>
       </AuthProvider>
     </Router>

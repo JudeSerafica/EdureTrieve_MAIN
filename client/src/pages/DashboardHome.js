@@ -37,7 +37,7 @@ function Dashboard() {
   // Store file info state (size, type, pages)
   const [fileInfo, setFileInfo] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
-  const modulesPerPage = 20;
+  const modulesPerPage = 50;
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -345,11 +345,7 @@ function Dashboard() {
     
           setUploadProgress(100);
           setMessage('✅ Module uploaded successfully!');
-          toast.success('✅ Module uploaded successfully!', {
-            progress: 100,
-            autoClose: 3000,
-            hideProgressBar: false,
-          });
+          toast.success('✅ Module uploaded successfully!');
     
           setTimeout(() => {
             setShowUploadModal(false);
