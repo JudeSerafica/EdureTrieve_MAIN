@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import useAuthStatus from "../hooks/useAuthStatus"
 import useTrackTime from "../hooks/useTrackTime"
 import { supabase } from "../supabaseClient"
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -253,8 +255,51 @@ function ProgressAnalyticsPage() {
   if (authLoading) {
     return (
       <div className="analytics-page">
-        <div className="analytics-loading">
-          <p>Loading...</p>
+        <div className="analytics-header-wrapper">
+          <div className="analytics-header">
+            <Skeleton width="200px" height={30} />
+            <Skeleton width={100} height={35} />
+          </div>
+          <Skeleton width="100%" height={2} style={{ margin: '10px 0' }} />
+        </div>
+
+        <div className="analytics-stats-grid">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="analytics-card">
+              <Skeleton circle width={50} height={50} style={{ marginBottom: '15px' }} />
+              <div className="analytics-card-content">
+                <Skeleton width="80%" height={20} />
+                <Skeleton width="60%" height={30} style={{ margin: '10px 0' }} />
+                <Skeleton width="70%" height={15} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="analytics-time-cards-grid" style={{ marginBottom: '2rem' }}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="analytics-time-card">
+              <Skeleton circle width={40} height={40} style={{ marginBottom: '10px' }} />
+              <Skeleton width="60%" height={20} />
+              <Skeleton width="50%" height={25} style={{ marginTop: '5px' }} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+          <div className="analytics-chart-card" style={{ height: "50vh", padding: '2rem' }}>
+            <Skeleton width="150px" height={25} style={{ marginBottom: '20px' }} />
+            <Skeleton width="100%" height={350} />
+          </div>
+          <div className="analytics-chart-card" style={{ height: "50vh", padding: '2rem' }}>
+            <Skeleton width="180px" height={25} style={{ marginBottom: '20px' }} />
+            <Skeleton width="100%" height={350} />
+          </div>
+        </div>
+
+        <div className="analytics-chart-card analytics-chart-full" style={{ height: "45vh", padding: '2rem' }}>
+          <Skeleton width="200px" height={25} style={{ marginBottom: '20px' }} />
+          <Skeleton width="100%" height={300} />
         </div>
       </div>
     )
@@ -339,9 +384,65 @@ function ProgressAnalyticsPage() {
       )}
 
       {loading ? (
-        <div className="analytics-loading">
-          <p>Loading your analytics...</p>
-        </div>
+        <>
+          {/* Stats Cards */}
+          <div className="analytics-stats-grid">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="analytics-card">
+                <Skeleton circle width={50} height={50} style={{ marginBottom: '15px' }} />
+                <div className="analytics-card-content">
+                  <Skeleton width="80%" height={20} />
+                  <Skeleton width="60%" height={30} style={{ margin: '10px 0' }} />
+                  <Skeleton width="70%" height={15} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Time Period Cards */}
+          <div className="analytics-time-cards-grid" style={{ marginBottom: '2rem' }}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="analytics-time-card">
+                <Skeleton circle width={40} height={40} style={{ marginBottom: '10px' }} />
+                <Skeleton width="60%" height={20} />
+                <Skeleton width="50%" height={25} style={{ marginTop: '5px' }} />
+              </div>
+            ))}
+          </div>
+
+          {/* Charts Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            {/* Bar Chart */}
+            <div className="analytics-chart-card" style={{ height: "50vh", padding: '2rem' }}>
+              <div className="analytics-chart-header">
+                <Skeleton width="150px" height={25} />
+              </div>
+              <div className="analytics-chart-container">
+                <Skeleton width="100%" height={350} />
+              </div>
+            </div>
+
+            {/* Pie Chart */}
+            <div className="analytics-chart-card" style={{ height: "50vh",padding: '2rem' }}>
+              <div className="analytics-chart-header">
+                <Skeleton width="180px" height={25} />
+              </div>
+              <div className="analytics-chart-container">
+                <Skeleton width="100%" height={350} />
+              </div>
+            </div>
+          </div>
+
+            {/* Line Chart - Time Spent */}
+            <div className="analytics-chart-card analytics-chart-full" style={{ height: "45vh",padding: '2rem' }}>
+              <div className="analytics-chart-header">
+                <Skeleton width="200px" height={25} />
+              </div>
+              <div className="analytics-chart-container">
+                <Skeleton width="100%" height={300} />
+              </div>
+            </div>
+        </>
       ) : (
         <>
           {/* Stats Cards */}

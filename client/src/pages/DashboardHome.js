@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { FaRegBookmark, FaDownload, FaEye,} from 'react-icons/fa';
+import { FaRegBookmark, FaDownload, FaEye} from 'react-icons/fa';
 import useAuthStatus from '../hooks/useAuthStatus';
 import { toast } from 'react-toastify';
 import FileViewer from "../components/FileViewer";
+import { useDropzone } from 'react-dropzone';
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
 
 function Dashboard() {
   const { user, authLoading } = useAuthStatus();
@@ -29,6 +32,7 @@ function Dashboard() {
   const [showViewer, setShowViewer] = useState(false);
   const [currentFileUrl, setCurrentFileUrl] = useState(null);
   const [currentFileName, setCurrentFileName] = useState(null);
+
 
   // Store file info state (size, type, pages)
   const [fileInfo, setFileInfo] = useState({});
@@ -281,85 +285,91 @@ function Dashboard() {
   };
 
       const handleUpload = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setMessage('');
-    setUploadProgress(0);
-
-    if (!title || !description) {
-      setMessage('❌ Title and description are required.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const token = session?.access_token;
-      if (!token) throw new Error('Missing auth token');
-
-      setUploadProgress(20);
-      setMessage('📤 Preparing upload...');
-
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      
-      if (file) {
-        formData.append('file', file);
-        setMessage('📎 Uploading file...');
-        setUploadProgress(50);
-      }
-
-      setMessage('💾 Saving module...');
-      setUploadProgress(80);
-
-      const res = await fetch('http://localhost:5000/upload-module', {
-        method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error || `HTTP ${res.status}: Upload failed`);
-      }
-
-      const result = await res.json();
-      console.log('✅ Upload successful:', result);
-      
-      // Add the new module with actual full name
-      const newModule = {
-        ...result.data,
-        uploadedBy: result.data.uploadedBy || 'Unknown User'
-      };
-      setModules(prev => [newModule, ...prev]);
-      
-      setUploadProgress(100);
-      setMessage('✅ Module uploaded successfully!');
-      toast.success('✅ Module uploaded successfully!');
-      
-      setTimeout(() => {
-        setShowUploadModal(false);
-        setTitle('');
-        setDescription('');
-        setFile(null);
+        e.preventDefault();
+        setIsSubmitting(true);
         setMessage('');
-      }, 1000);
-      
-    } catch (err) {
-      console.error('❌ Upload error:', err.message);
-      setMessage(`❌ Upload failed: ${err.message}`);
-      toast.error(`Upload failed: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-      setUploadProgress(0);
-    }
-  };
+        setUploadProgress(0);
+    
+        if (!title || !description || !file) {
+          setMessage('❌ Title, description, and file are required.');
+          setIsSubmitting(false);
+          return;
+        }
+    
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+    
+          const token = session?.access_token;
+          if (!token) throw new Error('Missing auth token');
+    
+          setUploadProgress(20);
+          setMessage('📤 Preparing upload...');
+    
+          const formData = new FormData();
+          formData.append('title', title);
+          formData.append('description', description);
+    
+          if (file) {
+            formData.append('file', file);
+            setMessage('📎 Uploading file...');
+            setUploadProgress(50);
+          }
+    
+          setMessage('💾 Saving module...');
+          setUploadProgress(80);
+    
+          const res = await fetch('http://localhost:5000/upload-module', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          });
+    
+          if (!res.ok) {
+            const result = await res.json();
+            throw new Error(result.error || `HTTP ${res.status}: Upload failed`);
+          }
+    
+          const result = await res.json();
+          console.log('✅ Upload successful:', result);
+    
+          // Add the new module with actual full name
+          const newModule = {
+            ...result.data,
+            uploadedBy: result.data.uploadedBy || 'Unknown User'
+          };
+          setModules(prev => [newModule, ...prev]);
+    
+          setUploadProgress(100);
+          setMessage('✅ Module uploaded successfully!');
+          toast.success('✅ Module uploaded successfully!', {
+            progress: 100,
+            autoClose: 3000,
+            hideProgressBar: false,
+          });
+    
+          setTimeout(() => {
+            setShowUploadModal(false);
+            setTitle('');
+            setDescription('');
+            setFile(null);
+            setMessage('');
+          }, 1000);
+    
+        } catch (err) {
+          console.error('❌ Upload error:', err.message);
+          setMessage(`❌ Upload failed: ${err.message}`);
+          toast.error(`Upload failed: ${err.message}`, {
+            autoClose: 5000,
+          });
+        } finally {
+          setIsSubmitting(false);
+          setUploadProgress(0);
+        }
+      };
 
 
   const handleViewFile = (fileUrl, fileName) => {
@@ -401,6 +411,7 @@ function Dashboard() {
     }
   };
 
+
   const formatDate = (dateString) => {
     try {
       if (!dateString) return 'Date not available';
@@ -434,9 +445,40 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="dashboard-page">
-        <h2>Available Modules</h2>
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <p>Loading modules...</p>
+        <div className="dashboard-headerss-wrapper">
+          <div className="dashboard-headerss">
+            <h2>📘 Available Modules</h2>
+            <div className="module-controls">
+              <Skeleton width={200} height={35} style={{ marginRight: '10px' }} />
+              <Skeleton width={150} height={35} />
+              <Skeleton width={150} height={35} />
+              <Skeleton width={150} height={35} />
+            </div>
+          </div>
+          <div className="dashboard-divider"></div>
+        </div>
+
+        <div className="module-list">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="module-card">
+              <div className="module-card-header">
+                <Skeleton width="80%" height={25} />
+                <Skeleton width={30} height={30} circle />
+              </div>
+              <div className="module-card-content">
+                <Skeleton width="100%" height={120} />
+                <Skeleton width="60%" height={15} style={{ marginTop: '10px' }} />
+                <Skeleton width="40%" height={15} />
+                <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                  <Skeleton width={80} height={30} />
+                  <Skeleton width={80} height={30} />
+                </div>
+              </div>
+              <div className="module-card-footer">
+                <Skeleton width="100%" height={35} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -507,6 +549,7 @@ function Dashboard() {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1); // Reset to first page when searching
               }}
+              aria-label="Search modules by title or description"
             />
             <select
               onChange={e => {
@@ -515,6 +558,7 @@ function Dashboard() {
               }}
               className="sort-dropdown"
               value={sortOption}
+              aria-label="Sort modules by"
             >
               <option value="latest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -529,6 +573,7 @@ function Dashboard() {
               }}
               className="sort-dropdown"
               value={dateFilter}
+              aria-label="Filter modules by date"
             >
               <option value="all">All Time</option>
               <option value="7days">Last 7 Days</option>
@@ -547,13 +592,21 @@ function Dashboard() {
           <div className="dashboard-empty">You haven't uploaded any modules yet.</div>
         )}
     
-      <div className="module-list">
+      <div className="module-list" style={{ transition: 'all 0.3s ease' }}>
         {currentModules.map((module) => (
-          <div key={module.id} className="module-card">
+          <div key={module.id} className="module-card" style={{ transition: 'all 0.3s ease' }}>
             <div className="module-card-header">
               <h3
                 onClick={() => window.location.href = `/module/${module.id}`}
                 className="module-title"
+                tabIndex={0}
+                role="button"
+                aria-label={`View module: ${module.title}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    window.location.href = `/module/${module.id}`;
+                  }
+                }}
               >
                 {module.title}
               </h3>
@@ -561,16 +614,18 @@ function Dashboard() {
                 onClick={() => handleToggleSave(module.id, module.title)}
                 className="save-module-button"
                 title={savedModuleIds.has(module.id) ? 'Remove Bookmark' : 'Save to Bookmarks'}
+                aria-label={savedModuleIds.has(module.id) ? `Remove ${module.title} from bookmarks` : `Save ${module.title} to bookmarks`}
               >
                 <FaRegBookmark
                   className={`save-icon ${savedModuleIds.has(module.id) ? 'saved' : 'unsaved'}`}
+                  aria-hidden="true"
                 />
               </button>
             </div>
 
             <div className="module-card-content">
               {/* FILE PREVIEW FEATURE */}
-      <div className="module-preview">
+      <div className="module-preview" style={{ transition: 'all 0.3s ease', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
   {module.file_url ? (
     <>
       {module.file_url.toLowerCase().endsWith(".pdf") && (
@@ -578,6 +633,10 @@ function Dashboard() {
           src={module.file_url}
           width="300"
           height="150"
+          left="10px"
+          alignItems="center"
+          justifyContent="center"
+          alignContent="center"
           style={{ border: "1px solid #ccc", borderRadius: "4px" }}
           title="PDF preview"
         />
@@ -659,18 +718,20 @@ function Dashboard() {
                     <button
                       className="view-file-button"
                       onClick={() => handleViewFile(module.file_url, module.file_name)}
+                      aria-label={`View file: ${module.file_name || module.title}`}
                     >
-                      <FaEye /> View File
+                      <FaEye aria-hidden="true" /> View File
                     </button>
                     <button
                       className="download-file-button"
                       onClick={() => handleDownloadFile(module.file_url, module.file_name || `${module.title}.pdf`)}
+                      aria-label={`Download file: ${module.file_name || module.title}`}
                     >
-                      <FaDownload /> Download
+                      <FaDownload aria-hidden="true" /> Download
                     </button>
                   </>
                 ) : (
-                  <div className="no-file-message">
+                  <div className="no-file-message" aria-label="No file attached to this module">
                     <span style={{ color: '#666', fontSize: '14px' }}>📄 No file attached</span>
                   </div>
                 )}
@@ -686,6 +747,7 @@ function Dashboard() {
               <button
                 onClick={() => handleDeleteClick(module.id)}
                 className="delete-module-button"
+                aria-label={`Delete module: ${module.title}`}
               >
                 🗑️ Delete Module
               </button>
@@ -742,11 +804,7 @@ function Dashboard() {
                 placeholder="Provide a detailed outline of the module topics, learning objectives, etc."></textarea>
               
               <label>Attach a file:</label>
-              <input 
-                type="file" 
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt" 
-                onChange={e => setFile(e.target.files[0])} 
-              />
+              <DropzoneComponent setFile={setFile} file={file} />
               
               {isSubmitting && (
                 <div className="upload-progress">
@@ -829,7 +887,84 @@ function Dashboard() {
           onClose={() => setShowViewer(false)}
         />
       )}
+
       </div>
 )}
+
+function DropzoneComponent({ setFile, file }) {
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        setFile(acceptedFiles[0]);
+      }
+    },
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.ms-powerpoint': ['.ppt'],
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+      'text/plain': ['.txt']
+    },
+    multiple: false,
+    maxSize: 50 * 1024 * 1024, // 50MB limit
+    onDropRejected: (fileRejections) => {
+      fileRejections.forEach(({ file, errors }) => {
+        errors.forEach((error) => {
+          if (error.code === 'file-too-large') {
+            toast.error(`File "${file.name}" is too large. Max size: 50MB`);
+          } else if (error.code === 'file-invalid-type') {
+            toast.error(`File type not supported: ${file.name}`);
+          } else {
+            toast.error(`Error with file "${file.name}": ${error.message}`);
+          }
+        });
+      });
+    }
+  });
+
+  return (
+    <div
+      {...getRootProps()}
+      style={{
+        border: `2px dashed ${isDragActive ? '#3458bb' : '#ccc'}`,
+        borderRadius: '8px',
+        padding: '20px',
+        textAlign: 'center',
+        cursor: 'pointer',
+        backgroundColor: isDragActive ? '#f0f8ff' : '#fafafa',
+        transition: 'all 0.3s ease',
+        marginBottom: '16px'
+      }}
+      aria-label="File upload area - drag and drop or click to select"
+      role="button"
+      tabIndex={0}
+    >
+      <input {...getInputProps()} />
+      <div style={{ fontSize: '48px', color: '#3458bb', marginBottom: '10px' }}>
+        📁
+      </div>
+      {file ? (
+        <div style={{ color: '#28a745', fontWeight: 'bold' }}>
+          <p>✅ File selected: {file.name}</p>
+          <p style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+            Size: {(file.size / (1024 * 1024)).toFixed(2)} MB
+          </p>
+        </div>
+      ) : isDragActive ? (
+        <p style={{ color: '#3458bb', fontWeight: 'bold' }}>
+          Drop the file here...
+        </p>
+      ) : (
+        <p style={{ color: '#666' }}>
+          Drag & drop a file here, or click to select
+        </p>
+      )}
+      <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+        Supported: PDF, DOC, DOCX, PPT, PPTX, TXT (Max: 50MB)
+      </p>
+    </div>
+  );
+}
 
 export default Dashboard;

@@ -3,7 +3,9 @@ import { supabase } from '../supabaseClient';
 import useAuthStatus from '../hooks/useAuthStatus';
 import { FaBookmark, FaDownload, FaEye, FaLink, FaFolder, FaPlus, FaTimes, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import FileViewer from "../components/FileViewer"; 
+import FileViewer from "../components/FileViewer";
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
 
 function Saves() {
   const { user, authLoading } = useAuthStatus();
@@ -559,15 +561,37 @@ useEffect(() => {
           <div className="dashboard-divider"></div>
         </div>
 
-        {loading && <div className="dashboard-loading">Loading modules...</div>}
+        {loading && (
+          <div className="module-list">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="module-card-hoverable">
+                <div className="module-card-header">
+                  <Skeleton width="80%" height={25} />
+                  <Skeleton width={30} height={30} circle />
+                </div>
+                <div className="module-card-content">
+                  <Skeleton width="100%" height={120} />
+                  <Skeleton width="60%" height={15} style={{ marginTop: '10px' }} />
+                  <Skeleton width="40%" height={15} />
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                    <Skeleton width={80} height={30} />
+                    <Skeleton width={80} height={30} />
+                    <Skeleton width={80} height={30} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {error && <div className="dashboard-error">{error}</div>}
         {!loading && filteredSavedModules.length === 0 && (
           <div className="dashboard-empty">You haven't saved any modules yet.</div>
         )}
 
-        <div className="module-list">
-          {filteredSavedModules.map((module) => (
-            <div key={module.id} className="module-card-hoverable">
+        {!loading && (
+          <div className="module-list" style={{ transition: 'all 0.3s ease' }}>
+            {filteredSavedModules.map((module) => (
+              <div key={module.id} className="module-card-hoverable" style={{ transition: 'all 0.3s ease' }}>
               <div className="module-card-header">
                 <h3>{module.title}</h3>
                 <button
@@ -581,6 +605,7 @@ useEffect(() => {
               <div className="module-card-content">
 
                 {/* FILE PREVIEW FEATURE */}
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
   {module.file_url ? (
     <>
       {module.file_url.toLowerCase().endsWith(".pdf") && (
@@ -652,6 +677,7 @@ useEffect(() => {
       📄 No File
     </div>
   )}
+  </div>
 
            {fileInfo[module.id] && (
                <p style={{ fontSize: "14px", color: "#444" }}>
@@ -708,16 +734,17 @@ useEffect(() => {
             </div>
             
           
-          {showViewer && (
-            <FileViewer
-              fileUrl={currentFileUrl}
-              fileName={currentFileName}
-              onClose={() => setShowViewer(false)}
-            />
-          )}
+            {showViewer && (
+              <FileViewer
+                fileUrl={currentFileUrl}
+                fileName={currentFileName}
+                onClose={() => setShowViewer(false)}
+              />
+            )}
+            </div>
+            ))}
           </div>
-          ))}
-        </div>
+        )}
       </div>
       
       <style jsx>{`

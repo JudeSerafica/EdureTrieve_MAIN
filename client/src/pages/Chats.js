@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useAuthStatus from '../hooks/useAuthStatus';
 import ReactMarkdown from 'react-markdown';
 import { FaPaperPlane, FaStop, FaPlus, FaComments, FaTrash, FaFileUpload } from 'react-icons/fa';
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
 import {
   formatFirebaseTimestamp,
   generateUniqueId,
@@ -399,8 +401,35 @@ function Chats() {
 
   if (authLoading) {
     return (
-      <div className="chat-container">
-        <p style={{ textAlign: 'center', marginTop: '50px', fontSize: '1.2em' }}>Loading user authentication...</p>
+      <div className="chat-page-content">
+        <div className="chat-history-sidebar-section">
+          <div className="history-panel-header">
+            <Skeleton width="60%" height={30} />
+            <Skeleton width={120} height={35} />
+          </div>
+          <div style={{ padding: '10px' }}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} style={{ marginBottom: '10px' }}>
+                <Skeleton width="100%" height={40} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="chat-main-section">
+          <div className="chat-messages-display">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="chat-message-card ai-message" style={{ marginBottom: '15px' }}>
+                <div className="message-content">
+                  <Skeleton width="80%" height={20} />
+                  <Skeleton width="60%" height={20} style={{ marginTop: '5px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="chat-input-area">
+            <Skeleton width="100%" height={50} />
+          </div>
+        </div>
       </div>
     );
   }
