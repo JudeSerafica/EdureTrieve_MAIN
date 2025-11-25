@@ -121,7 +121,7 @@ function UserProfile({ user }) {
     }
   };
 
-  if (!user) return <p>Please log in to view your profile.</p>;
+  if (!user) return <p>Please sign in to view your profile.</p>;
 
   return (
     <div className="profile-panel">

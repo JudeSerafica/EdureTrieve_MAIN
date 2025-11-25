@@ -441,7 +441,7 @@ useEffect(() => {
   };
 
   if (authLoading) return <div className="dashboard-loading">Checking authentication...</div>;
-  if (!user) return <div className="dashboard-not-logged-in">Please log in to view your saved modules.</div>;
+  if (!user) return <div className="dashboard-not-logged-in">Please sign in to view your saved modules.</div>;
 
   return (
     <div className="saves-container">

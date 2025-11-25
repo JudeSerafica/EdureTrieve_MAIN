@@ -48,7 +48,7 @@ async function updateUserProfile(userId, userData) {
   }
 }
 
-// ✅ Get analytics data: uploads, saves, and upload timeline
+// ✅ Get analytics data: uploads, saves, upload timeline, and time spent
 async function getUserAnalytics(userId) {
   if (!userId) throw new Error('User ID is required');
 
@@ -56,13 +56,15 @@ async function getUserAnalytics(userId) {
     { count: uploadedCount, error: uploadError },
     { count: savedCount, error: savedError },
     { data: uploadedData, error: uploadedDataError },
+    { data: timeData, error: timeError },
   ] = await Promise.all([
     supabase.from('modules').select('*', { count: 'exact', head: true }).eq('user_id', userId),
     supabase.from('save_modules').select('*', { count: 'exact', head: true }).eq('user_id', userId),
     supabase.from('modules').select('created_at').eq('user_id', userId),
+    supabase.from('usage_time').select('seconds_spent, date').eq('user_id', userId),
   ]);
 
-  if (uploadError || savedError || uploadedDataError) {
+  if (uploadError || savedError || uploadedDataError || timeError) {
     throw new Error('Failed to fetch analytics.');
   }
 
@@ -77,6 +79,25 @@ async function getUserAnalytics(userId) {
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   };
 
+  // Calculate time spent periods
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  let totalTime = 0, dailyTime = 0, weeklyTime = 0, monthlyTime = 0;
+
+  timeData.forEach(row => {
+    const seconds = row.seconds_spent || 0;
+    totalTime += seconds;
+
+    const rowDate = new Date(row.date);
+    if (rowDate.toDateString() === today.toDateString()) dailyTime += seconds;
+    if (rowDate >= startOfWeek) weeklyTime += seconds;
+    if (rowDate >= startOfMonth) monthlyTime += seconds;
+  });
+
   return {
     modulesUploaded: uploadedCount || 0,
     modulesSaved: savedCount || 0,
@@ -84,6 +105,12 @@ async function getUserAnalytics(userId) {
       daily: groupBy('daily'),
       weekly: groupBy('weekly'),
       monthly: groupBy('monthly'),
+    },
+    timeSpent: {
+      total: totalTime,
+      daily: dailyTime,
+      weekly: weeklyTime,
+      monthly: monthlyTime,
     },
   };
 }

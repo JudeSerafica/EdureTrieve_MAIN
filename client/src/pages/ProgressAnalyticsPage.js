@@ -28,10 +28,10 @@ function ProgressAnalyticsPage() {
   const [daily, setDaily] = useState(0)
   const [weekly, setWeekly] = useState(0)
   const [monthly, setMonthly] = useState(0)
+  const [currentSessionTime, setCurrentSessionTime] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [totalUsers, setTotalUsers] = useState(0)
-  const [currentSessionTime, setCurrentSessionTime] = useState(0)
   const [studyStreak, setStudyStreak] = useState(0)
   const [folderStats, setFolderStats] = useState([])
   const [timeSeriesData, setTimeSeriesData] = useState([])
@@ -169,51 +169,6 @@ function ProgressAnalyticsPage() {
   }, [user?.id])
 
   useEffect(() => {
-    if (authLoading || !user?.id) return
-
-    loadAnalytics(true)
-
-    // Real-time subscription for usage_time table with 5-second throttling
-    const handleTimeUpdate = (payload) => {
-      const now = Date.now()
-      const timeSinceLastRefresh = now - lastRefreshTimeRef.current
-      
-      // Only listen to INSERT and UPDATE events
-      if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') {
-        return
-      }
-      
-      // Throttle: only refresh if at least 5 seconds have passed
-      if (timeSinceLastRefresh >= 5000) {
-        console.log(`📊 Real-time ${payload.eventType}: Synchronizing Today/Week/Month from Supabase`)
-        lastRefreshTimeRef.current = now
-        loadAnalytics(false) // Silent refresh - recalculates all time metrics
-      } else {
-        const waitTime = Math.round((5000 - timeSinceLastRefresh) / 1000)
-        console.log(`⏳ Throttled: ${waitTime}s until next sync`)
-      }
-    }
-
-    const channel = supabase
-      .channel(`progress-analytics-time-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "usage_time",
-          filter: `user_id=eq.${user.id}`
-        },
-        handleTimeUpdate
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [authLoading, user?.id, loadAnalytics])
-
-  useEffect(() => {
     if (!user?.id) {
       setCurrentSessionTime(0)
       return
@@ -245,6 +200,49 @@ function ProgressAnalyticsPage() {
       }
     }
   }, [user?.id])
+
+  useEffect(() => {
+    if (authLoading || !user?.id) return
+
+    loadAnalytics(true)
+
+    // Real-time subscription for usage_time table with 10-second throttling for UI updates
+    const handleTimeUpdate = (payload) => {
+      const now = Date.now()
+      const timeSinceLastRefresh = now - lastRefreshTimeRef.current
+
+      // Only listen to INSERT and UPDATE events
+      if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') {
+        return
+      }
+
+      // Update immediately for real-time experience (no throttling for better UX)
+      console.log(`📊 Real-time ${payload.eventType}: Updating UI from Supabase`)
+      lastRefreshTimeRef.current = now
+      loadAnalytics(false) // Silent refresh - recalculates all time metrics including chart data
+    }
+
+    const channel = supabase
+      .channel(`progress-analytics-time-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "usage_time",
+          filter: `user_id=eq.${user.id}`
+        },
+        handleTimeUpdate
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [authLoading, user?.id, loadAnalytics])
+
+  // Remove local session timer - rely only on Supabase real-time updates
+  // UI will update every 10 seconds when time data changes in database
 
   function formatTime(seconds) {
     const h = Math.floor(seconds / 3600)
@@ -309,7 +307,7 @@ function ProgressAnalyticsPage() {
     return (
       <div className="analytics-page">
         <div className="analytics-loading">
-          <p>Please log in to view your progress analytics.</p>
+          <p>Please sign in to view your progress analytics.</p>
         </div>
       </div>
     )
@@ -480,7 +478,7 @@ function ProgressAnalyticsPage() {
               <div className="analytics-card-content">
                 <p className="analytics-card-label">Total Time Spent</p>
                 <h3 className="analytics-card-value" style={{ color: "#F59E0B" }}>
-                  {formatTime(timeSpent + currentSessionTime)}
+                  {formatTime(timeSpent)}
                 </h3>
                 <p className="analytics-card-meta">Total time on platform</p>
               </div>
@@ -511,13 +509,13 @@ function ProgressAnalyticsPage() {
             <div className="analytics-time-card">
               <div className="analytics-time-card-icon">🗓️</div>
               <h4 className="analytics-time-card-label">This Week</h4>
-              <p className="analytics-time-card-value">{formatTime(weekly + currentSessionTime)}</p>
+              <p className="analytics-time-card-value">{formatTime(weekly)}</p>
             </div>
 
             <div className="analytics-time-card">
               <div className="analytics-time-card-icon">📊</div>
               <h4 className="analytics-time-card-label">This Month</h4>
-              <p className="analytics-time-card-value">{formatTime(monthly + currentSessionTime)}</p>
+              <p className="analytics-time-card-value">{formatTime(monthly)}</p>
             </div>
 
             <div className="analytics-time-card">

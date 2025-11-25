@@ -11,7 +11,22 @@ export default function useTrackTime(user) {
     if (!user?.id) return;
 
     console.log('🚀 Starting time tracking for user:', user.id);
-    startRef.current = Date.now(); // Reset start time when user changes
+
+    // Check if there's existing session time from localStorage for continuity
+    const todayDate = new Date().toDateString();
+    const storageKey = `sessionStart_${user.id}_${todayDate}`;
+    const storedStartTime = localStorage.getItem(storageKey);
+
+    if (storedStartTime && JSON.parse(storedStartTime).date === todayDate) {
+      // Continue from previous session
+      startRef.current = JSON.parse(storedStartTime).timestamp;
+      console.log('🔄 Continuing time tracking from previous session');
+    } else {
+      // Start new session
+      startRef.current = Date.now();
+      localStorage.setItem(storageKey, JSON.stringify({ timestamp: startRef.current, date: todayDate }));
+      console.log('🆕 Starting new time tracking session');
+    }
 
     const saveTime = async () => {
       // Only track time if user is active (tab is focused)
@@ -104,7 +119,7 @@ export default function useTrackTime(user) {
         clearInterval(intervalRef.current);
         console.log('🛑 Time tracking stopped');
       }
-      
+
       // Clean up event listeners
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);

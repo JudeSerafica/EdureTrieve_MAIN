@@ -335,7 +335,7 @@ const EnhancedSignup = () => {
 
         {step !== 'completed' && (
           <p className="auth-link">
-            Already have an account? <a href="/login">Login here</a>
+            Already have an account? <a href="/login">Sign in here</a>
           </p>
         )}
       </div>

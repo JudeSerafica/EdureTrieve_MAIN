@@ -12,6 +12,7 @@
     "firebase": "^11.8.1",
     "google-auth-library": "^9.0.0",
     "pdfjs-dist": "^5.4.149",
+    "prop-types": "^15.8.1",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.3.8",
     "react-icons": "^5.5.0",

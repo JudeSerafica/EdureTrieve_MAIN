@@ -615,7 +615,7 @@ function Chats() {
             </button>
           </form>
           {error && <p className="error-message">{error}</p>}
-          {!user && !error && <p className="info-message">Please log in to start chatting.</p>}
+          {!user && !error && <p className="info-message">Please sign in to start chatting.</p>}
           {!activeSessionId && user && !error && <p className="info-message">Click "New Chat" or select a past chat to begin.</p>}
         </div>
       </div>

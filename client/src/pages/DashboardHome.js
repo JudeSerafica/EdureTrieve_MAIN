@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { FaRegBookmark, FaDownload, FaEye} from 'react-icons/fa';
+import { FaRegBookmark, FaBookmark, FaDownload, FaEye} from 'react-icons/fa';
 import useAuthStatus from '../hooks/useAuthStatus';
 import { toast } from 'react-toastify';
 import FileViewer from "../components/FileViewer";
@@ -212,29 +212,45 @@ function Dashboard() {
     if (!user) {
       toast.warning('⚠️ You must be logged in to save modules.');
       return;
-    };
-
-    const isSaved = savedModuleIds.has(moduleId);
-    if (isSaved) {
-      toast.info('⚠️ Module already saved.');
-      return;
     }
 
+    const isSaved = savedModuleIds.has(moduleId);
+
     try {
-      const { error } = await supabase.from('save_modules').insert({
-        module_id: moduleId,
-        user_id: user.id,
-        title: moduleTitle,
-      });
+      if (isSaved) {
+        // Unsave the module
+        const { error } = await supabase
+          .from('save_modules')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('module_id', moduleId);
 
-      if (error) throw new Error(error.message);
+        if (error) throw new Error(error.message);
 
-      setSavedModuleIds(prev => new Set(prev).add(moduleId));
-      window.dispatchEvent(new Event('saved-modules-updated'));
-      toast.success('✅ Module saved!');
+        setSavedModuleIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(moduleId);
+          return newSet;
+        });
+        window.dispatchEvent(new Event('saved-modules-updated'));
+        toast.success('✅ Module unsaved!');
+      } else {
+        // Save the module
+        const { error } = await supabase.from('save_modules').insert({
+          module_id: moduleId,
+          user_id: user.id,
+          title: moduleTitle,
+        });
+
+        if (error) throw new Error(error.message);
+
+        setSavedModuleIds(prev => new Set(prev).add(moduleId));
+        window.dispatchEvent(new Event('saved-modules-updated'));
+        toast.success('✅ Module saved!');
+      }
     } catch (err) {
-      console.error('❌ Save error:', err.message);
-      toast.error(`❌ Save failed: ${err.message}`);
+      console.error('❌ Save/Unsave error:', err.message);
+      toast.error(`❌ ${isSaved ? 'Unsave' : 'Save'} failed: ${err.message}`);
     }
   };
 
@@ -284,6 +300,13 @@ function Dashboard() {
     }
   };
 
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleUpload(e);
+        }
+      };
+    
       const handleUpload = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -608,14 +631,15 @@ function Dashboard() {
               </h3>
               <button
                 onClick={() => handleToggleSave(module.id, module.title)}
-                className="save-module-button"
+                className={`save-module-button ${savedModuleIds.has(module.id) ? 'saved' : ''}`}
                 title={savedModuleIds.has(module.id) ? 'Remove Bookmark' : 'Save to Bookmarks'}
                 aria-label={savedModuleIds.has(module.id) ? `Remove ${module.title} from bookmarks` : `Save ${module.title} to bookmarks`}
               >
-                <FaRegBookmark
-                  className={`save-icon ${savedModuleIds.has(module.id) ? 'saved' : 'unsaved'}`}
-                  aria-hidden="true"
-                />
+                {savedModuleIds.has(module.id) ? (
+                  <FaBookmark className="saved-icon" aria-hidden="true" />
+                ) : (
+                  <FaRegBookmark className="save-icon" aria-hidden="true" />
+                )}
               </button>
             </div>
 
@@ -792,11 +816,11 @@ function Dashboard() {
             <h3>Upload Module</h3>
             <form onSubmit={handleUpload}>
               <label>Module Title:</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required 
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={handleKeyDown} required
               placeholder="e.g., Introduction to Calculus"/>
-              
+
               <label>Module Outline/Description:</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} rows="6" required
+              <textarea value={description} onChange={e => setDescription(e.target.value)} onKeyDown={handleKeyDown} rows="6" required
                 placeholder="Provide a detailed outline of the module topics, learning objectives, etc."></textarea>
               
               <label>Attach a file:</label>

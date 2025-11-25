@@ -130,7 +130,7 @@ function HomePageContent() {
         <div style={logoStyle}>EDURETRIEVE</div>
         <div style={navButtonsStyle}>
           <Link to="/login" style={logInButtonStyle}>
-            Log In
+            Sign In
           </Link>
           <Link to="/signup" style={signUpButtonStyle}>
             Sign Up
@@ -140,7 +140,7 @@ function HomePageContent() {
 
       <div style={containerStyle}>
 
-        <h1 style={headingStyle}>Learn Smarter with EduRetrieve AI</h1>
+        <h1 style={headingStyle}>Learn Smarter with EduRerieve AI</h1>
         <p style={paragraphStyle}>
           Upload your study materials and chat with AI to get instant answers, summaries, and personalized learning
           insights.
